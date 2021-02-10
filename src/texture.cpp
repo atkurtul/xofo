@@ -1,7 +1,7 @@
 #include "texture.h"
 #include <image.h>
 #include <math.h>
-#include <stb_image.h>
+//#include <stb_image.h>
 #include <vk.h>
 #include <cstdio>
 #include <cstdlib>
@@ -156,31 +156,17 @@ void generate_mips(VkCommandBuffer cmd,
 
 Box<Texture> Texture::mk(std::string file, VkFormat format) {
   std::replace(file.begin(), file.end(), '\\', '/');
-  int width, height, n;
-  u8* data;
-  u32 size;
-  //   u8* data = stbi_load(file.c_str(), &width, &height, &n, 4);
-  //   u32 size = width * height * 4;
 
-  {
-    mango::Bitmap bitmap(file, mango::Format(32, mango::Format::UNORM,
-                                             mango::Format::RGBA, 8, 8, 8, 8));
-    width = bitmap.width;
-    height = bitmap.height;
+  mango::Bitmap bitmap(file, mango::Format(32, mango::Format::UNORM,
+                                           mango::Format::RGBA, 8, 8, 8, 8));
 
-    size = width * height * 4;
-    data = (u8*)malloc(size);
-    memcpy(data, bitmap.address(0, 0), size);
-  }
+  u64 size = bitmap.width * bitmap.height * 4;
 
-  if (!data) {
-    printf("Failed to load texture %s\n", file.c_str());
-    abort();
-  }
+  VkExtent2D extent = {(u32)bitmap.width, (u32)bitmap.height};
 
-  VkExtent2D extent = {(u32)width, (u32)height};
+  u32 mip = (u32)floor(log2(bitmap.width > bitmap.height ? bitmap.width
+                                                         : bitmap.height)) + 1;
 
-  u32 mip = (u32)floor(log2(width > height ? width : height)) + 1;
   auto image =
       Box<Texture>((Texture*)Image::mk(
                        format, Image::Src | Image::Dst | Image::Sampled, extent,
@@ -188,8 +174,8 @@ Box<Texture> Texture::mk(std::string file, VkFormat format) {
                        .release());
 
   auto src = Buffer::mk(size, Buffer::Src, Buffer::Mapped);
-  memcpy(src->mapping, data, size);
-  free(data);
+  memcpy(src->mapping, bitmap.image, size);
+
   vk.execute([&](auto cmd) {
     copy_texture(cmd, *src, *image, extent);
     generate_mips(cmd, mip, *image, extent);

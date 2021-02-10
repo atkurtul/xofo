@@ -13,32 +13,44 @@ void Resources::init() {
       .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
       .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT |
                VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT};
+  
   CHECKRE(vkCreateCommandPool(vk, &pool_info, 0, &pool));
 
   u32 count;
   VkSurfaceCapabilitiesKHR cap;
+  
   CHECKRE(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk, surface, &cap));
+  
   extent = cap.currentExtent;
+  
   CHECKRE(vkGetPhysicalDeviceSurfaceFormatsKHR(vk, surface, &count, 0));
+  
   vector<VkSurfaceFormatKHR> formats(count);
+  
   CHECKRE(vkGetPhysicalDeviceSurfaceFormatsKHR(vk, surface, &count,
                                                formats.data()));
   fmt = formats[0];
   //fmt.format = VK_FORMAT_B8G8R8A8_UNORM;
 
   CHECKRE(vkGetPhysicalDeviceSurfacePresentModesKHR(vk, surface, &count, 0));
+  
   VkPresentModeKHR mod = VK_PRESENT_MODE_IMMEDIATE_KHR;
   vector<VkPresentModeKHR> mods(count);
+  
   CHECKRE(vkGetPhysicalDeviceSurfacePresentModesKHR(vk, surface, &count,
                                                     mods.data()));
+  
   for (int i = 0; i < count; ++i) {
     if (mods[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
       mod = VK_PRESENT_MODE_MAILBOX_KHR;
       break;
     }
   }
+
   u32 supported;
+  
   CHECKRE(vkGetPhysicalDeviceSurfaceSupportKHR(vk, 0, surface, &supported));
+  
   VkSwapchainCreateInfoKHR swapchain_info = {
       .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
       .surface = surface,
@@ -57,6 +69,7 @@ void Resources::init() {
       .clipped = 1,
       .oldSwapchain = 0,
   };
+  
   CHECKRE((vkCreateSwapchainKHR(vk, &swapchain_info, 0, &swapchain)));
 
   depth_buffer = Image::mk(
@@ -174,20 +187,30 @@ void Resources::free_frames() {
   vector<VkCommandBuffer> buff(frames.size());
   for (u32 i = 0; i < frames.size(); ++i) {
     buff[i] = frames[i].cmd;
+    
     vkDestroyFramebuffer(vk, frames[i].framebuffer, 0);
+    
     vkDestroyImageView(vk, frames[i].view, 0);
+    
     vkDestroyFence(vk, frames[i].fence, 0);
+    
     vkDestroySemaphore(vk, frames[i].acquire, 0);
+    
     vkDestroySemaphore(vk, frames[i].present, 0);
   }
-  (vkFreeCommandBuffers(vk, pool, buff.size(), buff.data()));
+
+  vkFreeCommandBuffers(vk, pool, buff.size(), buff.data());
 }
 
 void Resources::free() {
   vkDestroySwapchainKHR(vk, swapchain, 0);
+  
   free_frames();
+  
   depth_buffer.reset();
+  
   vkDestroyCommandPool(vk, pool, 0);
+  
   vkDestroyRenderPass(vk, renderpass, 0);
 }
 
@@ -199,6 +222,7 @@ Vk::Vk() {
       .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
       .apiVersion = VK_API_VERSION_1_2,
   };
+  
   VkInstanceCreateInfo info = {
       .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
       .pApplicationInfo = &app,
@@ -207,36 +231,51 @@ Vk::Vk() {
       .enabledExtensionCount = (u32)ext.size(),
       .ppEnabledExtensionNames = ext.data(),
   };
+  
   CHECKRE(vkCreateInstance(&info, 0, &instance));
 
   CHECKRE(vkEnumeratePhysicalDevices(instance, &count, 0));
+  
   vector<VkPhysicalDevice> buff(count);
+  
   CHECKRE(vkEnumeratePhysicalDevices(instance, &count, buff.data()));
+  
   pdev = buff.front();
+  
   init_device();
+  
   win.create_surface(instance, 1600, 900);
+  
   res.init();
 }
 
 Vk::~Vk() {
   res.free();
+  
   win.free();
+  
   vmaDestroyAllocator(allocator);
 
   extern void destroy_samplers();
+  
   destroy_samplers();
-  (vkDestroyDevice(dev, 0));
-  (vkDestroyInstance(instance, 0));
+  
+  vkDestroyDevice(dev, 0);
+
+  vkDestroyInstance(instance, 0);
 }
 
 void Vk::init_device() {
   {
     float prio = 1.f;
+
     VkDeviceQueueCreateInfo qinfo = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
         .queueCount = 1,
         .pQueuePriorities = &prio};
+
     const char* ext[] = {"VK_KHR_swapchain"};
+
     VkDeviceCreateInfo info = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
         .queueCreateInfoCount = 1,
@@ -248,8 +287,10 @@ void Vk::init_device() {
     };
 
     CHECKRE(vkCreateDevice(pdev, &info, 0, &dev));
+
     vkGetDeviceQueue(dev, 0, 0, &queue);
   }
+  
   {
     VmaAllocatorCreateInfo info = {
         .physicalDevice = pdev,
@@ -257,6 +298,7 @@ void Vk::init_device() {
         .instance = instance,
         .vulkanApiVersion = VK_API_VERSION_1_2,
     };
+
     CHECKRE(vmaCreateAllocator(&info, &allocator));
   }
 }
@@ -270,6 +312,7 @@ VkCommandBuffer Vk::get_cmd() {
   };
 
   VkCommandBuffer cmd;
+
   CHECKRE(vkAllocateCommandBuffers(dev, &info, &cmd));
 
   VkCommandBufferBeginInfo begin_info = {
@@ -277,6 +320,7 @@ VkCommandBuffer Vk::get_cmd() {
       .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
 
   CHECKRE(vkBeginCommandBuffer(cmd, &begin_info));
+
   return cmd;
 }
 
@@ -286,18 +330,25 @@ void Vk::submit_cmd(VkCommandBuffer cmd) {
       .commandBufferCount = 1,
       .pCommandBuffers = &cmd,
   };
+
   VkFenceCreateInfo fence_info = {.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
   VkFence fence;
+
   CHECKRE(vkCreateFence(dev, &fence_info, 0, &fence));
+
   CHECKRE(vkEndCommandBuffer(cmd));
+
   CHECKRE(vkQueueSubmit(queue, 1, &info, fence));
+
   CHECKRE(vkWaitForFences(dev, 1, &fence, 1, -1));
+
   vkDestroyFence(dev, fence, 0);
+
   vkFreeCommandBuffers(dev, res.pool, 1, &cmd);
 }
 
 
-void Vk::draw(std::function<void(VkCommandBuffer)> const& f) {
+void Vk::draw(function<void(VkCommandBuffer)> const& f) {
   u32 prev = res.curr;
 
   while (vkAcquireNextImageKHR(dev, res.swapchain, -1, res.frames[prev].acquire,
@@ -318,14 +369,16 @@ void Vk::draw(std::function<void(VkCommandBuffer)> const& f) {
         .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
 
     CHECKRE(vkWaitForFences(vk, 1, &curr.fence, 1, -1));
+    
     CHECKRE(vkResetFences(vk, 1, &curr.fence));
+    
     vkResetCommandBuffer(curr.cmd,
                          VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
     CHECKRE(vkBeginCommandBuffer(curr.cmd, &info));
   }
   {
     VkClearValue clear[] = {
-        {.color = {.float32 = {.5f, 0, .4f, 0}}},
+        {.color = {.float32 = {.2f, 0.4f, .8f, 0}}},
         {.depthStencil = {.depth = 1.f, .stencil = 1}},
     };
 
@@ -337,15 +390,18 @@ void Vk::draw(std::function<void(VkCommandBuffer)> const& f) {
         .clearValueCount = 2,
         .pClearValues = clear,
     };
-    (vkCmdBeginRenderPass(curr.cmd, &info, VK_SUBPASS_CONTENTS_INLINE));
+    vkCmdBeginRenderPass(curr.cmd, &info, VK_SUBPASS_CONTENTS_INLINE);
   }
 
   f(curr.cmd);
 
   {
     u32 stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    
     vkCmdEndRenderPass(curr.cmd);
+    
     CHECKRE(vkEndCommandBuffer(curr.cmd));
+    
     VkSubmitInfo info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .waitSemaphoreCount = 1,
@@ -358,6 +414,7 @@ void Vk::draw(std::function<void(VkCommandBuffer)> const& f) {
     };
     CHECKRE(vkQueueSubmit(queue, 1, &info, curr.fence));
   }
+  
   {
     VkPresentInfoKHR info = {
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
@@ -367,6 +424,7 @@ void Vk::draw(std::function<void(VkCommandBuffer)> const& f) {
         .pSwapchains = &res.swapchain,
         .pImageIndices = &res.curr,
     };
-    (vkQueuePresentKHR(queue, &info));
+    
+    vkQueuePresentKHR(queue, &info);
   }
 }

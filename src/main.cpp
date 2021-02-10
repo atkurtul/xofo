@@ -7,6 +7,7 @@
 #include <vulkan/vulkan_core.h>
 #include <cstring>
 #include <memory>
+#include <imgui.h>
 
 int main() {
   Box<Pipeline> pipeline(new Pipeline("shaders/shader"));
@@ -24,7 +25,8 @@ int main() {
   {
     // MeshLoader mesh_loader("teapot.obj", 32);
     // MeshLoader mesh_loader("models/scene_Scene.fbx", 32);
-    MeshLoader mesh_loader("models/wmaker/0.obj", 32);
+    //MeshLoader mesh_loader("models/wmaker/0.obj", 32);
+    MeshLoader mesh_loader("models/doom/0.obj", 32);
     // MeshLoader mesh_loader("models/car/car.obj", 32);
     mesh_loader.tex = 12;
     mesh_loader.norm = 20;
@@ -51,9 +53,14 @@ int main() {
       vkCmdCopyBuffer(cmd, *staging, *buffer, 1, &reg);
     });
   }
+
+  
   u32 prev, curr = vk.res.frames.size() - 1;
+  
   auto cam_set = uniform->bind_to_set(pipeline->alloc_set(0), 0);
+  
   Camera cam(1600, 900);
+  
   vk.register_callback([&]() {
     cam.set_prj(vk.res.extent.width, vk.res.extent.height);
     pipeline->reset();
