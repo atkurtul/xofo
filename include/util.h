@@ -16,7 +16,7 @@ template <class T>
 using Opt = std::optional<T>;
 
 const char* vk_result_string(VkResult re);
-
+const char* desc_type_string(VkDescriptorType ty);
 #define CHECKRE(expr)                                                          \
   {                                                                            \
     VkResult re = (expr);                                                      \

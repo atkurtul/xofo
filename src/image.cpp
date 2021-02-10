@@ -22,7 +22,7 @@ static VkSampler create_sampler(VkSamplerAddressMode mode, uint mip) {
       .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
       .magFilter = VK_FILTER_LINEAR,
       .minFilter = VK_FILTER_LINEAR,
-      .mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST,
+      .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
       .addressModeU = mode,
       .addressModeV = mode,
       .addressModeW = mode,
@@ -43,8 +43,8 @@ void Image::type_layout(VkImageUsageFlags usage,
                         VkImageLayout& layout) {
   switch (usage & (Sampled | Storage | Color | DepthStencil | Input)) {
     case Sampled:
-      //type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-      type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+      type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+      //type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
       layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
       break;
     case Storage:
@@ -72,7 +72,6 @@ Box<Image> Image::mk(VkFormat format,
                      u32 mip,
                      VkSampleCountFlagBits ms,
                      VkImageAspectFlags aspect) {
-  // VkImage handle = MkVkImage(format, usage, extent, mip, ms);
 
   VkImage image;
   VmaAllocation allocation;
@@ -135,7 +134,7 @@ Image::~Image() {
 
 VkDescriptorSet Image::bind_to_set(VkDescriptorSet set, u32 bind) {
   VkDescriptorImageInfo info = {
-      //.sampler = sampler,
+      .sampler = sampler,
       .imageView = view,
       .imageLayout = layout,
   };

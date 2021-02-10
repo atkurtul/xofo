@@ -155,15 +155,14 @@ void generate_mips(VkCommandBuffer cmd,
 #include <mango/image/surface.hpp>
 
 Box<Texture> Texture::mk(std::string file, VkFormat format) {
-
   std::replace(file.begin(), file.end(), '\\', '/');
   int width, height, n;
-  u8* data = stbi_load(file.c_str(), &width, &height, &n, 4);
+  u8* data;
+  u32 size;
+  //   u8* data = stbi_load(file.c_str(), &width, &height, &n, 4);
+  //   u32 size = width * height * 4;
 
-  u32 size = width * height * 4;
-  if (!data) {
-    printf("Failed to load texture %s\n", file.c_str());
-    abort();
+  {
     mango::Bitmap bitmap(file, mango::Format(32, mango::Format::UNORM,
                                              mango::Format::RGBA, 8, 8, 8, 8));
     width = bitmap.width;
@@ -171,7 +170,12 @@ Box<Texture> Texture::mk(std::string file, VkFormat format) {
 
     size = width * height * 4;
     data = (u8*)malloc(size);
-    memcpy(data, bitmap.address(0,0), size);
+    memcpy(data, bitmap.address(0, 0), size);
+  }
+
+  if (!data) {
+    printf("Failed to load texture %s\n", file.c_str());
+    abort();
   }
 
   VkExtent2D extent = {(u32)width, (u32)height};

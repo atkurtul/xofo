@@ -24,8 +24,8 @@ void Resources::init() {
   CHECKRE(vkGetPhysicalDeviceSurfaceFormatsKHR(vk, surface, &count,
                                                formats.data()));
   fmt = formats[0];
-  fmt.format = VK_FORMAT_B8G8R8A8_UNORM;
-  cout << "Format is " << fmt.format << " " << formats.size() << "\n";
+  //fmt.format = VK_FORMAT_B8G8R8A8_UNORM;
+
   CHECKRE(vkGetPhysicalDeviceSurfacePresentModesKHR(vk, surface, &count, 0));
   VkPresentModeKHR mod = VK_PRESENT_MODE_IMMEDIATE_KHR;
   vector<VkPresentModeKHR> mods(count);

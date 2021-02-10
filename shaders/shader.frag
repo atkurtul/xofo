@@ -10,6 +10,7 @@ layout(set = 1, binding = 1) uniform sampler2D normal;
 layout(set = 1, binding = 2) uniform sampler2D metalic;
 
 void main() {
-    color = texture(albedo, tex);
-    //color = col;
+
+    color =  texture(albedo, tex);
+    // color = col;
 }

@@ -23,8 +23,8 @@ int main() {
 
   {
     // MeshLoader mesh_loader("teapot.obj", 32);
-    //MeshLoader mesh_loader("models/scene_Scene.fbx", 32);
-    MeshLoader mesh_loader("models/doom/0.obj", 32);
+    // MeshLoader mesh_loader("models/scene_Scene.fbx", 32);
+    MeshLoader mesh_loader("models/wmaker/0.obj", 32);
     // MeshLoader mesh_loader("models/car/car.obj", 32);
     mesh_loader.tex = 12;
     mesh_loader.norm = 20;
@@ -39,12 +39,10 @@ int main() {
     sets.reserve(mats.size());
     for (auto& mat : mats) {
       auto set = pipeline->alloc_set(1);
-      if (mat.diffuse.has_value()) {
+      if (mat.diffuse.has_value())
         mat.diffuse.value()->bind_to_set(set, 0);
-      }
-      if (mat.normal.has_value()) {
+      if (mat.normal.has_value())
         mat.normal.value()->bind_to_set(set, 1);
-      }
       sets.push_back(set);
     }
 
@@ -53,14 +51,12 @@ int main() {
       vkCmdCopyBuffer(cmd, *staging, *buffer, 1, &reg);
     });
   }
-  cout << mats.size() <<  " " << sets.size() << "\n";
   u32 prev, curr = vk.res.frames.size() - 1;
   auto cam_set = uniform->bind_to_set(pipeline->alloc_set(0), 0);
   Camera cam(1600, 900);
   vk.register_callback([&]() {
     cam.set_prj(vk.res.extent.width, vk.res.extent.height);
-    pipeline.reset(new Pipeline("shaders/shader"));
-    cam_set = uniform->bind_to_set(pipeline->alloc_set(0), 0);
+    pipeline->reset();
   });
 
   while (vk.win.poll()) {
