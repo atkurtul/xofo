@@ -66,7 +66,7 @@ extern struct Vk {
   }
   void draw(function<void(VkCommandBuffer)> const&);
 
- private:
+ 
   void init_device();
   vector<function<void()>> callbacks;
   VkInstance instance;
@@ -74,7 +74,6 @@ extern struct Vk {
   VkPhysicalDevice pdev;
   VkQueue queue;
   VmaAllocator allocator;
-public:
   Window win;
   Resources res;
 } vk;

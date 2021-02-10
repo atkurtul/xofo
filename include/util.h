@@ -25,4 +25,5 @@ const char* desc_type_string(VkDescriptorType ty);
       abort();                                                                 \
     }                                                                          \
   }
+
 #endif /* E7EA5D0B_5989_44BF_A123_639B65E5D7ED */

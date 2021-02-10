@@ -3,13 +3,15 @@ cmake_minimum_required(VERSION 3.16)
 project(abc)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_CXX_FLAGS "-pthread")
+set(CMAKE_CXX_FLAGS "-pthread -g")
 file(GLOB src src/*.cpp)
 
 
 add_subdirectory(external)
 add_executable(vk ${src})
 
+#set(CMAKE_BUILD_TYPE DEBUG)
+set(CMAKE_BUILD_TYPE RELEASE)
 
 add_dependencies(vk mango_download)
 

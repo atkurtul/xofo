@@ -15,7 +15,7 @@ std::vector<const char*> Window::init() {
 VkResult Window::create_surface(VkInstance instance, int x, int y) {
   glfw = glfwCreateWindow(x, y, "window", 0, 0);
   glfwSetInputMode(glfw, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
-  glfwSetInputMode(glfw, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+  //glfwSetInputMode(glfw, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   return glfwCreateWindowSurface(instance, glfw, 0, &surface);
 }
 

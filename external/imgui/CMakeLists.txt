@@ -5,6 +5,7 @@ add_library(imgui ${src})
 
 target_include_directories(imgui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
+#set(CMAKE_BUILD_TYPE DEBUG)
 set(CMAKE_BUILD_TYPE RELEASE)
 
 
