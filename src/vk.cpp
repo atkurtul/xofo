@@ -1,9 +1,66 @@
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_vulkan.h>
 #include <vk.h>
 #include <vulkan/vulkan_core.h>
 #include <cstring>
 #include <memory>
 
 Vk vk;
+VkDescriptorPool imgui_pool;
+
+void init_imgui() {
+  // Setup Dear ImGui context
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+
+  // Setup Dear ImGui style
+  ImGui::StyleColorsDark();
+  // ImGui::StyleColorsClassic();
+
+  // Setup Platform/Renderer backends
+  ImGui_ImplGlfw_InitForVulkan(vk.win.glfw, true);
+  ImGui_ImplVulkan_InitInfo init_info = {
+      .Instance = vk.instance,
+      .PhysicalDevice = vk.pdev,
+      .Device = vk.dev,
+      .Queue = vk.queue,
+      .MinImageCount = (u32)vk.res.frames.size(),
+      .ImageCount = (u32)vk.res.frames.size(),
+  };
+  {
+    VkDescriptorPoolSize pools[3] = {
+        {
+            .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = 1024,
+        },
+        {
+            .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorCount = 1024,
+        },
+        {
+            .type = VK_DESCRIPTOR_TYPE_SAMPLER,
+            .descriptorCount = 1024,
+        }};
+
+    VkDescriptorPoolCreateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .maxSets = 1024,
+        .poolSizeCount = 3,
+        .pPoolSizes = pools,
+    };
+
+    CHECKRE(vkCreateDescriptorPool(vk, &info, 0, &imgui_pool));
+    init_info.DescriptorPool = imgui_pool;
+  }
+
+  ImGui_ImplVulkan_Init(&init_info, vk.res.renderpass);
+
+  {
+    vk.execute([](auto cmd) { ImGui_ImplVulkan_CreateFontsTexture(cmd); });
+
+    ImGui_ImplVulkan_DestroyFontUploadObjects();
+  }
+}
 
 void Resources::init() {
   auto surface = vk.win.surface;
@@ -13,33 +70,33 @@ void Resources::init() {
       .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
       .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT |
                VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT};
-  
+
   CHECKRE(vkCreateCommandPool(vk, &pool_info, 0, &pool));
 
   u32 count;
   VkSurfaceCapabilitiesKHR cap;
-  
+
   CHECKRE(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk, surface, &cap));
-  
+
   extent = cap.currentExtent;
-  
+
   CHECKRE(vkGetPhysicalDeviceSurfaceFormatsKHR(vk, surface, &count, 0));
-  
+
   vector<VkSurfaceFormatKHR> formats(count);
-  
+
   CHECKRE(vkGetPhysicalDeviceSurfaceFormatsKHR(vk, surface, &count,
                                                formats.data()));
   fmt = formats[0];
-  //fmt.format = VK_FORMAT_B8G8R8A8_UNORM;
+  // fmt.format = VK_FORMAT_B8G8R8A8_UNORM;
 
   CHECKRE(vkGetPhysicalDeviceSurfacePresentModesKHR(vk, surface, &count, 0));
-  
+
   VkPresentModeKHR mod = VK_PRESENT_MODE_IMMEDIATE_KHR;
   vector<VkPresentModeKHR> mods(count);
-  
+
   CHECKRE(vkGetPhysicalDeviceSurfacePresentModesKHR(vk, surface, &count,
                                                     mods.data()));
-  
+
   for (int i = 0; i < count; ++i) {
     if (mods[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
       mod = VK_PRESENT_MODE_MAILBOX_KHR;
@@ -48,9 +105,9 @@ void Resources::init() {
   }
 
   u32 supported;
-  
+
   CHECKRE(vkGetPhysicalDeviceSurfaceSupportKHR(vk, 0, surface, &supported));
-  
+
   VkSwapchainCreateInfoKHR swapchain_info = {
       .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
       .surface = surface,
@@ -69,12 +126,12 @@ void Resources::init() {
       .clipped = 1,
       .oldSwapchain = 0,
   };
-  
+
   CHECKRE((vkCreateSwapchainKHR(vk, &swapchain_info, 0, &swapchain)));
 
-  depth_buffer = Image::mk(
-      VK_FORMAT_D32_SFLOAT, Image::DepthStencil | Image::Transient, extent, 1,
-      VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_ASPECT_DEPTH_BIT);
+  depth_buffer =
+      Image::mk(VK_FORMAT_D32_SFLOAT, Image::DepthStencil | Image::Transient,
+                extent, 1, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_ASPECT_DEPTH_BIT);
 
   // color_buffer =
   //     Image::create(vk, fmt.format, Image::Color | Image::Transient, extent,
@@ -187,15 +244,15 @@ void Resources::free_frames() {
   vector<VkCommandBuffer> buff(frames.size());
   for (u32 i = 0; i < frames.size(); ++i) {
     buff[i] = frames[i].cmd;
-    
+
     vkDestroyFramebuffer(vk, frames[i].framebuffer, 0);
-    
+
     vkDestroyImageView(vk, frames[i].view, 0);
-    
+
     vkDestroyFence(vk, frames[i].fence, 0);
-    
+
     vkDestroySemaphore(vk, frames[i].acquire, 0);
-    
+
     vkDestroySemaphore(vk, frames[i].present, 0);
   }
 
@@ -204,13 +261,13 @@ void Resources::free_frames() {
 
 void Resources::free() {
   vkDestroySwapchainKHR(vk, swapchain, 0);
-  
+
   free_frames();
-  
+
   depth_buffer.reset();
-  
+
   vkDestroyCommandPool(vk, pool, 0);
-  
+
   vkDestroyRenderPass(vk, renderpass, 0);
 }
 
@@ -222,7 +279,7 @@ Vk::Vk() {
       .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
       .apiVersion = VK_API_VERSION_1_2,
   };
-  
+
   VkInstanceCreateInfo info = {
       .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
       .pApplicationInfo = &app,
@@ -231,35 +288,42 @@ Vk::Vk() {
       .enabledExtensionCount = (u32)ext.size(),
       .ppEnabledExtensionNames = ext.data(),
   };
-  
+
   CHECKRE(vkCreateInstance(&info, 0, &instance));
 
   CHECKRE(vkEnumeratePhysicalDevices(instance, &count, 0));
-  
+
   vector<VkPhysicalDevice> buff(count);
-  
+
   CHECKRE(vkEnumeratePhysicalDevices(instance, &count, buff.data()));
-  
+
   pdev = buff.front();
-  
+
   init_device();
-  
+
   win.create_surface(instance, 1600, 900);
-  
+
   res.init();
+
+  init_imgui();
 }
 
 Vk::~Vk() {
+  vkDestroyDescriptorPool(dev, imgui_pool, 0);
+  ImGui_ImplVulkan_Shutdown();
+  ImGui_ImplGlfw_Shutdown();
+  ImGui::DestroyContext();
+
   res.free();
-  
+
   win.free();
-  
+
   vmaDestroyAllocator(allocator);
 
   extern void destroy_samplers();
-  
+
   destroy_samplers();
-  
+
   vkDestroyDevice(dev, 0);
 
   vkDestroyInstance(instance, 0);
@@ -290,7 +354,7 @@ void Vk::init_device() {
 
     vkGetDeviceQueue(dev, 0, 0, &queue);
   }
-  
+
   {
     VmaAllocatorCreateInfo info = {
         .physicalDevice = pdev,
@@ -347,20 +411,18 @@ void Vk::submit_cmd(VkCommandBuffer cmd) {
   vkFreeCommandBuffers(dev, res.pool, 1, &cmd);
 }
 
+void Vk::draw(function<void(VkCommandBuffer)> const& f,
+              function<void()> const& imgui) {
+  ImGui_ImplGlfw_NewFrame();
+  ImGui::NewFrame();
+  imgui();
+  ImGui::Render();
 
-void Vk::draw(function<void(VkCommandBuffer)> const& f) {
   u32 prev = res.curr;
 
   while (vkAcquireNextImageKHR(dev, res.swapchain, -1, res.frames[prev].acquire,
-                               0, &res.curr) != VK_SUCCESS) {
-    vkDeviceWaitIdle(dev);
-    res.free();
-    res.init();
-
-    for (auto& callback : callbacks) {
-      callback();
-    }
-  }
+                               0, &res.curr) != VK_SUCCESS)
+    recreate();
 
   auto& curr = res.frames[res.curr];
   {
@@ -369,16 +431,16 @@ void Vk::draw(function<void(VkCommandBuffer)> const& f) {
         .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
 
     CHECKRE(vkWaitForFences(vk, 1, &curr.fence, 1, -1));
-    
+
     CHECKRE(vkResetFences(vk, 1, &curr.fence));
-    
+
     vkResetCommandBuffer(curr.cmd,
                          VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
     CHECKRE(vkBeginCommandBuffer(curr.cmd, &info));
   }
   {
     VkClearValue clear[] = {
-        {.color = {.float32 = {.2f, 0.4f, .8f, 0}}},
+        {.color = {.float32 = {color.x, color.y, color.z, color.w}}},
         {.depthStencil = {.depth = 1.f, .stencil = 1}},
     };
 
@@ -394,14 +456,15 @@ void Vk::draw(function<void(VkCommandBuffer)> const& f) {
   }
 
   f(curr.cmd);
+  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), curr.cmd);
 
   {
     u32 stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    
+
     vkCmdEndRenderPass(curr.cmd);
-    
+
     CHECKRE(vkEndCommandBuffer(curr.cmd));
-    
+
     VkSubmitInfo info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .waitSemaphoreCount = 1,
@@ -414,7 +477,7 @@ void Vk::draw(function<void(VkCommandBuffer)> const& f) {
     };
     CHECKRE(vkQueueSubmit(queue, 1, &info, curr.fence));
   }
-  
+
   {
     VkPresentInfoKHR info = {
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
@@ -424,7 +487,7 @@ void Vk::draw(function<void(VkCommandBuffer)> const& f) {
         .pSwapchains = &res.swapchain,
         .pImageIndices = &res.curr,
     };
-    
+
     vkQueuePresentKHR(queue, &info);
   }
 }

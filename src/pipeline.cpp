@@ -17,6 +17,10 @@ vector<u32> compile_glsl(const char* file, shaderc_shader_kind stage) {
   auto src = read_to_string(file);
   shaderc::Compiler comp;
   auto re = comp.CompileGlslToSpv(src.c_str(), src.size(), stage, file);
+  if (re.GetCompilationStatus()) {
+    cerr << re.GetErrorMessage() << "\n";
+    abort();
+  }
   return vector<u32>(re.begin(), re.end());
 }
 
@@ -88,9 +92,12 @@ void build_set_layouts(sc::Compiler& cc,
     auto set =
         cc.get_decoration(res.id, spv::Decoration::DecorationDescriptorSet);
     auto bind = cc.get_decoration(res.id, spv::Decoration::DecorationBinding);
-    bindings.resize(set + 1);
-    bindings[set].resize(bind + 1);
-
+    if (bindings.size() < set + 1) {
+      bindings.resize(set + 1);
+    }
+    if (bindings[set].size() < bind + 1) {
+      bindings[set].resize(bind + 1);
+    }
     auto& desc = bindings[set][bind];
     if (desc.descriptorCount != 0) {
       if (desc.descriptorType != ty) {
@@ -104,31 +111,17 @@ void build_set_layouts(sc::Compiler& cc,
   }
 }
 
-auto extract_input_state_and_uniforms(
+struct ShaderData {
+  vector<VkVertexInputAttributeDescription> attr;
+  u32 stride;
+};
+
+ShaderData extract_input_state_and_uniforms(
     vector<u32> const& bytecode,
     VkShaderStageFlags stage,
     vector<vector<VkDescriptorSetLayoutBinding>>& bindings) {
   sc::Compiler cc(bytecode);
   auto res = cc.get_shader_resources();
-
-  vector<VkVertexInputAttributeDescription> attr(res.stage_inputs.size());
-
-  for (auto& input : res.stage_inputs) {
-    auto loc = cc.get_decoration(input.id, spv::Decoration::DecorationLocation);
-    auto ty = cc.get_type(input.type_id);
-
-    VkFormat format = type_format(ty.basetype, ty.vecsize);
-    attr[loc].format = format;
-    attr[loc].location = loc;
-    attr[loc].offset = ty.vecsize * 4;
-  }
-  u32 stride = 0;
-
-  for (auto& input : attr) {
-    auto tmp = stride;
-    stride += input.offset;
-    input.offset = tmp;
-  }
 
   build_set_layouts(cc, res.uniform_buffers, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                     stage, bindings);
@@ -143,12 +136,29 @@ auto extract_input_state_and_uniforms(
                     // VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
                     stage, bindings);
 
-  struct {
-    vector<VkVertexInputAttributeDescription> attr;
-    u32 stride;
-  } re = {attr, stride};
+  if (stage != VK_SHADER_STAGE_VERTEX_BIT)
+    return {};
 
-  return re;
+  vector<VkVertexInputAttributeDescription> attr(res.stage_inputs.size());
+  for (auto& input : res.stage_inputs) {
+    auto loc = cc.get_decoration(input.id, spv::Decoration::DecorationLocation);
+    auto ty = cc.get_type(input.type_id);
+
+    VkFormat format = type_format(ty.basetype, ty.vecsize);
+    attr[loc].format = format;
+    attr[loc].location = loc;
+    attr[loc].offset = ty.vecsize * 4;
+  }
+
+  u32 stride = 0;
+
+  for (auto& input : attr) {
+    auto tmp = stride;
+    stride += input.offset;
+    input.offset = tmp;
+  }
+
+  return {attr, stride};
 }
 
 Pipeline::Pipeline(string const& shader) : shader(shader) {
@@ -165,6 +175,7 @@ Pipeline::Pipeline(string const& shader) : shader(shader) {
   this->stride = stride;
   extract_input_state_and_uniforms(bin1, VK_SHADER_STAGE_FRAGMENT_BIT,
                                    bindings);
+
   // decriptor pool
   for (auto& bindings : bindings) {
     unordered_map<VkDescriptorType, u32> sizes;
@@ -186,7 +197,7 @@ Pipeline::Pipeline(string const& shader) : shader(shader) {
     this->pools.push_back(pool);
   }
 
-  //set layouts
+  // set layouts
 
   for (auto& bindings : bindings) {
     VkDescriptorSetLayoutCreateInfo info = {
@@ -199,11 +210,20 @@ Pipeline::Pipeline(string const& shader) : shader(shader) {
     set_layouts.push_back(layout);
   }
 
-  //pipeline layout
+  // pipeline layout
+
+  VkPushConstantRange range = {
+      .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+      .offset = 0,
+      .size = 256,
+  };
+
   VkPipelineLayoutCreateInfo layout_info = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
       .setLayoutCount = (u32)set_layouts.size(),
       .pSetLayouts = set_layouts.data(),
+      .pushConstantRangeCount = 1,
+      .pPushConstantRanges = &range,
   };
 
   CHECKRE(vkCreatePipelineLayout(vk, &layout_info, 0, &layout));
@@ -250,7 +270,7 @@ void Pipeline::create() {
 
   VkPipelineInputAssemblyStateCreateInfo InputAssemblyState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-      .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+      .topology = topology,
   };
 
   VkViewport Viewports = {
@@ -273,8 +293,8 @@ void Pipeline::create() {
   };
   VkPipelineDepthStencilStateCreateInfo DepthStencilState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-      .depthTestEnable = 1,
-      .depthWriteEnable = 1,
+      .depthTestEnable = depth_test,
+      .depthWriteEnable = depth_write,
       .depthCompareOp = VK_COMPARE_OP_LESS,
   };
   VkPipelineColorBlendAttachmentState Attachments = {
@@ -299,7 +319,7 @@ void Pipeline::create() {
 
   VkPipelineRasterizationStateCreateInfo RasterizationState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-      .polygonMode = VK_POLYGON_MODE_FILL,
+      .polygonMode = mode,
       .lineWidth = 1.f};
 
   VkGraphicsPipelineCreateInfo info = {

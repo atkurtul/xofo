@@ -3,8 +3,7 @@
 
 #include <typedefs.h>
 #include <stdio.h>
-#include <mango/math/matrix_float4x4.hpp>
-#include <mango/math/quaternion.hpp>
+
 
 struct Camera {
   mat prj;
@@ -20,8 +19,8 @@ struct Camera {
     prj = mango::vulkan::perspective(fov, fov * y / x, 0.01, 4000);
   }
 
-  mat update(vec2 md, f32 fwd, f32 lr) {
-    pos = (pos + ori[2] * fwd * 0.0005f + ori[0] * lr * 0.0005f);
+  mat update(vec2 md, f32 fwd, f32 lr, f32 dt) {
+    pos = (pos + ori[2] * fwd * dt + ori[0] * lr * dt);
     ori = ori * mango::AngleAxis(md.y, ori[0].xyz) *
     
     mango::AngleAxis(md.x, vec3(0,1,0));

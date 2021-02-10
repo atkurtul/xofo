@@ -1,7 +1,9 @@
 #ifndef A85441C4_7ECF_4EE1_8160_B7BEA0D5A239
 #define A85441C4_7ECF_4EE1_8160_B7BEA0D5A239
 #include <stdint.h>
-#include <mango/math/matrix.hpp>
+#include <mango/math/math.hpp>
+#include <mango/math/quaternion.hpp>
+
 
 #define RADIAN 0.01745329251f
 
@@ -12,6 +14,9 @@ using vec4 = mango::float32x4;
 using vec2d = mango::float64x2;
 using vec3d = mango::float64x3;
 using vec4d = mango::float64x4;
+using vec2i = mango::int32x2;
+using vec3i = mango::int32x3;
+using vec4i = mango::int32x4;
 
 typedef int8_t i8;
 typedef int16_t i16;

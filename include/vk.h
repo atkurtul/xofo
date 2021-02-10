@@ -21,6 +21,7 @@ struct Resources {
 
   Box<Image> depth_buffer;
   u32 curr;
+
   struct PerFrame {
     VkImage img;
     VkImageView view;
@@ -41,8 +42,6 @@ struct Resources {
 extern struct Vk {
   inline static const char* layer[] = {"VK_LAYER_KHRONOS_validation"};
 
-
-
   Vk();
   ~Vk();
 
@@ -61,13 +60,24 @@ extern struct Vk {
   VkCommandBuffer get_cmd();
 
   void submit_cmd(VkCommandBuffer cmd);
-  void register_callback(function<void()> f) {
-    callbacks.push_back(move(f));
-  }
-  void draw(function<void(VkCommandBuffer)> const&);
 
- 
+  void register_callback(function<void()> f) { callbacks.push_back(move(f)); }
+
+  void recreate() {
+    vkDeviceWaitIdle(dev);
+    res.free();
+    res.init();
+
+    for (auto& callback : callbacks) {
+      callback();
+    }
+  }
+
+  void draw(function<void(VkCommandBuffer)> const&, function<void()> const& imgui);
+
   void init_device();
+
+  vec4 color = vec4{0.2, 0.4, 0.8, 1};
   vector<function<void()>> callbacks;
   VkInstance instance;
   VkDevice dev;

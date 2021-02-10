@@ -17,7 +17,10 @@ struct Window {
 
   void free();
   bool poll();
-
+  void resize(VkExtent2D x);
   bool get_key(char);
+  bool mbutton(int lr);
+  void hide_mouse();
+  void unhide_mouse();
 };
 #endif /* AF397561_55AE_459A_8D47_6FDBECDDE96F */

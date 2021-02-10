@@ -8,6 +8,7 @@
 
 struct Texture : Image  {
   static Box<Texture> mk(std::string file, VkFormat format);
+  static Box<Texture> mk(void* data, VkFormat format, u32 width, u32 height);
 };
 
 

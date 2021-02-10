@@ -1,8 +1,9 @@
 
 #include <vk.h>
 #include <vulkan/vulkan_core.h>
-
 #include <GLFW/glfw3.h>
+
+
 std::vector<const char*> Window::init() {
   glfwInit();
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -15,13 +16,25 @@ std::vector<const char*> Window::init() {
 VkResult Window::create_surface(VkInstance instance, int x, int y) {
   glfw = glfwCreateWindow(x, y, "window", 0, 0);
   glfwSetInputMode(glfw, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
-  //glfwSetInputMode(glfw, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+  // glfwSetInputMode(glfw, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   return glfwCreateWindowSurface(instance, glfw, 0, &surface);
 }
 
 void Window::free() {
   glfwDestroyWindow(glfw);
   vkDestroySurfaceKHR(vk, surface, 0);
+}
+
+void Window::hide_mouse() {
+  glfwSetInputMode(glfw, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+}
+void Window::unhide_mouse() {
+  glfwSetInputMode(glfw, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+}
+
+void Window::resize(VkExtent2D v) {
+  glfwSetWindowSize(glfw, v.width, v.height);
+  vk.recreate();
 }
 
 bool Window::poll() {
@@ -57,4 +70,8 @@ bool Window::poll() {
 
 bool Window::get_key(char key) {
   return glfwGetKey(glfw, key);
+}
+
+bool Window::mbutton(int lr) {
+  return glfwGetMouseButton(glfw, lr);
 }

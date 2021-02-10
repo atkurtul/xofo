@@ -1,10 +1,10 @@
 #include "texture.h"
 #include <image.h>
 #include <math.h>
-//#include <stb_image.h>
 #include <vk.h>
 #include <cstdio>
 #include <cstdlib>
+#include <mango/image/surface.hpp>
 
 void copy_texture(VkCommandBuffer cmd,
                   VkBuffer src,
@@ -152,20 +152,13 @@ void generate_mips(VkCommandBuffer cmd,
                        &barr);
 }
 
-#include <mango/image/surface.hpp>
 
-Box<Texture> Texture::mk(std::string file, VkFormat format) {
-  std::replace(file.begin(), file.end(), '\\', '/');
+Box<Texture> Texture::mk(void* data, VkFormat format, u32 width, u32 height) {
+  u64 size = width * height * 4;
 
-  mango::Bitmap bitmap(file, mango::Format(32, mango::Format::UNORM,
-                                           mango::Format::RGBA, 8, 8, 8, 8));
+  VkExtent2D extent = {width, height};
 
-  u64 size = bitmap.width * bitmap.height * 4;
-
-  VkExtent2D extent = {(u32)bitmap.width, (u32)bitmap.height};
-
-  u32 mip = (u32)floor(log2(bitmap.width > bitmap.height ? bitmap.width
-                                                         : bitmap.height)) + 1;
+  u32 mip = (u32)floor(log2(width > height ? width : height)) + 1;
 
   auto image =
       Box<Texture>((Texture*)Image::mk(
@@ -174,11 +167,21 @@ Box<Texture> Texture::mk(std::string file, VkFormat format) {
                        .release());
 
   auto src = Buffer::mk(size, Buffer::Src, Buffer::Mapped);
-  memcpy(src->mapping, bitmap.image, size);
+  memcpy(src->mapping, data, size);
 
   vk.execute([&](auto cmd) {
     copy_texture(cmd, *src, *image, extent);
     generate_mips(cmd, mip, *image, extent);
   });
+
   return image;
+}
+
+Box<Texture> Texture::mk(std::string file, VkFormat format) {
+  std::replace(file.begin(), file.end(), '\\', '/');
+
+  mango::Bitmap bitmap(file, mango::Format(32, mango::Format::UNORM,
+                                           mango::Format::RGBA, 8, 8, 8, 8));
+
+  return Texture::mk(bitmap.image, format, bitmap.width, bitmap.height);
 }

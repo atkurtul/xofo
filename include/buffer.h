@@ -1,5 +1,6 @@
 #ifndef D8F23374_2F16_4692_A5AE_7D3369B8E620
 #define D8F23374_2F16_4692_A5AE_7D3369B8E620
+#include <vk_mem_alloc.h>
 #include <util.h>
 #include <cstring>
 
@@ -24,7 +25,7 @@ struct Buffer {
 
   operator VkBuffer() const { return buffer; }
 
-  void copy(size_t offset, void* pp, size_t len) { memcpy(mapping, pp, len); }
+  void copy(size_t len, void* pp, size_t offset = 0) { memcpy(mapping + offset, pp, len); }
 
   template <class T>
   void copy(T const& obj, size_t offset = 0) {

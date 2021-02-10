@@ -14,7 +14,7 @@ MeshLoader::MeshLoader(const char* file, u32 stride)
       importer(new Assimp::Importer),
       scene(0),
       tex(0),
-      norm(0),
+      norm0(0),
       norm1(0),
       norm2(0) {}
 
@@ -55,7 +55,14 @@ std::vector<Material> MeshLoader::load(char* buffer) {
   string base = file;
 
   base.erase(base.begin() + base.find_last_of("/") + 1, base.end());
-  Rc<Texture> defo(Texture::mk("blue.png", VK_FORMAT_R8G8B8A8_SRGB).release());
+  u8 bb[4] = { 0,0,0,255};
+
+
+  Rc<Texture> black(Texture::mk(bb, VK_FORMAT_R8G8B8A8_SRGB, 1, 1));
+  bb[2] = 255;
+  Rc<Texture> blue(Texture::mk(bb, VK_FORMAT_R8G8B8A8_SRGB, 1, 1));
+  bb[0] = bb[1] = 255;
+  Rc<Texture> white(Texture::mk(bb, VK_FORMAT_R8G8B8A8_SRGB, 1, 1));
 
   for (u32 i = 0; i < scene->mNumMaterials; ++i) {
     Material mmat;
@@ -66,8 +73,9 @@ std::vector<Material> MeshLoader::load(char* buffer) {
     if (aiReturn_SUCCESS == mat->Get(AI_MATKEY_COLOR_DIFFUSE, color)) {
       mmat.color = vec3{color.r, color.g, color.b};
     }
-    mmat.diffuse = defo;
-    mmat.normal = defo;
+    mmat.diffuse = white;
+    mmat.normal = blue;
+    mmat.metallic = black;
 
     if (aiReturn_SUCCESS == mat->GetTexture(aiTextureType_DIFFUSE, 0, &path)) {
       string rpath = base + path.C_Str();
@@ -86,6 +94,7 @@ std::vector<Material> MeshLoader::load(char* buffer) {
       }
       mmat.normal = textures[path.C_Str()];
     }
+
     mats.push_back(mmat);
   }
 
@@ -97,8 +106,8 @@ std::vector<Material> MeshLoader::load(char* buffer) {
       if (tex && mesh->mTextureCoords[0])
         memcpy(buffer + tex, &mesh->mTextureCoords[0][j], 8);
 
-      if (norm && mesh->mNormals)
-        memcpy(buffer + norm, mesh->mNormals + j, 12);
+      if (norm0 && mesh->mNormals)
+        memcpy(buffer + norm0, mesh->mNormals + j, 12);
 
       if (norm1 && mesh->mTangents)
         memcpy(buffer + norm1, mesh->mTangents + j, 12);

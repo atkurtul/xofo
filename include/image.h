@@ -1,6 +1,6 @@
 #ifndef B4289538_0D44_47DC_927C_CB5FB0CAE07A
 #define B4289538_0D44_47DC_927C_CB5FB0CAE07A
-
+#include <vk_mem_alloc.h>
 #include <util.h>
 
 struct Image {

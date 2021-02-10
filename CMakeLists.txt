@@ -3,22 +3,24 @@ cmake_minimum_required(VERSION 3.16)
 project(abc)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_INCLUDE_HEADERS_IN_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_FLAGS "-pthread -g")
 file(GLOB src src/*.cpp)
+file(GLOB headers include/*.h)
 
 
 add_subdirectory(external)
-add_executable(vk ${src})
+add_executable(vk ${headers} ${src})
 
-#set(CMAKE_BUILD_TYPE DEBUG)
-set(CMAKE_BUILD_TYPE RELEASE)
+set(CMAKE_BUILD_TYPE DEBUG)
+#set(CMAKE_BUILD_TYPE RELEASE)
 
 add_dependencies(vk mango_download)
 
 target_include_directories(vk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_include_directories(vk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/external/mango/include)
-target_include_directories(vk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/external/vma)
-target_include_directories(vk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/external/mango/src/mango_download/include)
+
+# target_include_directories(vk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/external/vma)
+target_include_directories(vk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/external/include)
 target_link_directories(vk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/external/lib)
 
 

@@ -1,7 +1,6 @@
 #ifndef E7EA5D0B_5989_44BF_A123_639B65E5D7ED
 #define E7EA5D0B_5989_44BF_A123_639B65E5D7ED
 #include <typedefs.h>
-#include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 #include <memory>
 #include <optional>
