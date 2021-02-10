@@ -23,7 +23,9 @@ void Resources::init() {
   vector<VkSurfaceFormatKHR> formats(count);
   CHECKRE(vkGetPhysicalDeviceSurfaceFormatsKHR(vk, surface, &count,
                                                formats.data()));
-  fmt = formats.front();
+  fmt = formats[0];
+  fmt.format = VK_FORMAT_B8G8R8A8_UNORM;
+  cout << "Format is " << fmt.format << " " << formats.size() << "\n";
   CHECKRE(vkGetPhysicalDeviceSurfacePresentModesKHR(vk, surface, &count, 0));
   VkPresentModeKHR mod = VK_PRESENT_MODE_IMMEDIATE_KHR;
   vector<VkPresentModeKHR> mods(count);
@@ -43,11 +45,13 @@ void Resources::init() {
       .minImageCount = cap.minImageCount + 1,
       .imageFormat = fmt.format,
       .imageColorSpace = fmt.colorSpace,
+      //.imageFormat = VK_FORMAT_B8G8R8A8_UNORM,
+      //.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
       .imageExtent = extent,
       .imageArrayLayers = cap.maxImageArrayLayers,
       .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
       .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
-      .preTransform = (VkSurfaceTransformFlagBitsKHR)cap.supportedTransforms,
+      .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
       .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
       .presentMode = mod,
       .clipped = 1,
@@ -55,7 +59,7 @@ void Resources::init() {
   };
   CHECKRE((vkCreateSwapchainKHR(vk, &swapchain_info, 0, &swapchain)));
 
-  depth_buffer = make_unique<Image>(
+  depth_buffer = Image::mk(
       VK_FORMAT_D32_SFLOAT, Image::DepthStencil | Image::Transient, extent, 1,
       VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_ASPECT_DEPTH_BIT);
 
@@ -153,14 +157,13 @@ void Resources::init() {
     for (int i = 0; i < count; ++i) {
       frames[i].cmd = cmd[i];
       view.image = frames[i].img = images[i];
-      CHECKRE((vkCreateImageView(vk, &view, 0, &frames[i].view)));
+      CHECKRE(vkCreateImageView(vk, &view, 0, &frames[i].view));
       VkImageView attachments[] = {frames[i].view, depth_buffer->view};
       framebuffer.pAttachments = attachments;
-      CHECKRE(
-          (vkCreateFramebuffer(vk, &framebuffer, 0, &frames[i].framebuffer)));
-      CHECKRE((vkCreateFence(vk, &fence, 0, &frames[i].fence)));
-      CHECKRE((vkCreateSemaphore(vk, &sp, 0, &frames[i].acquire)));
-      CHECKRE((vkCreateSemaphore(vk, &sp, 0, &frames[i].present)));
+      CHECKRE(vkCreateFramebuffer(vk, &framebuffer, 0, &frames[i].framebuffer));
+      CHECKRE(vkCreateFence(vk, &fence, 0, &frames[i].fence));
+      CHECKRE(vkCreateSemaphore(vk, &sp, 0, &frames[i].acquire));
+      CHECKRE(vkCreateSemaphore(vk, &sp, 0, &frames[i].present));
     }
   }
 
@@ -171,21 +174,21 @@ void Resources::free_frames() {
   vector<VkCommandBuffer> buff(frames.size());
   for (u32 i = 0; i < frames.size(); ++i) {
     buff[i] = frames[i].cmd;
-    (vkDestroyFramebuffer(vk, frames[i].framebuffer, 0));
-    (vkDestroyImageView(vk, frames[i].view, 0));
-    (vkDestroyFence(vk, frames[i].fence, 0));
-    (vkDestroySemaphore(vk, frames[i].acquire, 0));
-    (vkDestroySemaphore(vk, frames[i].present, 0));
+    vkDestroyFramebuffer(vk, frames[i].framebuffer, 0);
+    vkDestroyImageView(vk, frames[i].view, 0);
+    vkDestroyFence(vk, frames[i].fence, 0);
+    vkDestroySemaphore(vk, frames[i].acquire, 0);
+    vkDestroySemaphore(vk, frames[i].present, 0);
   }
   (vkFreeCommandBuffers(vk, pool, buff.size(), buff.data()));
 }
 
 void Resources::free() {
+  vkDestroySwapchainKHR(vk, swapchain, 0);
   free_frames();
   depth_buffer.reset();
-  (vkDestroyCommandPool(vk, pool, 0));
-  (vkDestroyRenderPass(vk, renderpass, 0));
-  (vkDestroySwapchainKHR(vk, swapchain, 0));
+  vkDestroyCommandPool(vk, pool, 0);
+  vkDestroyRenderPass(vk, renderpass, 0);
 }
 
 Vk::Vk() {
@@ -211,7 +214,7 @@ Vk::Vk() {
   CHECKRE(vkEnumeratePhysicalDevices(instance, &count, buff.data()));
   pdev = buff.front();
   init_device();
-  win.create_surface(instance, 800, 600);
+  win.create_surface(instance, 1600, 900);
   res.init();
 }
 
@@ -293,10 +296,21 @@ void Vk::submit_cmd(VkCommandBuffer cmd) {
   vkFreeCommandBuffers(dev, res.pool, 1, &cmd);
 }
 
-void Vk::draw(std::function<void(VkCommandBuffer)> f) {
+
+void Vk::draw(std::function<void(VkCommandBuffer)> const& f) {
   u32 prev = res.curr;
-  vkAcquireNextImageKHR(dev, res.swapchain, -1, res.frames[prev].acquire, 0,
-                        &res.curr);
+
+  while (vkAcquireNextImageKHR(dev, res.swapchain, -1, res.frames[prev].acquire,
+                               0, &res.curr) != VK_SUCCESS) {
+    vkDeviceWaitIdle(dev);
+    res.free();
+    res.init();
+
+    for (auto& callback : callbacks) {
+      callback();
+    }
+  }
+
   auto& curr = res.frames[res.curr];
   {
     VkCommandBufferBeginInfo info = {
@@ -353,6 +367,6 @@ void Vk::draw(std::function<void(VkCommandBuffer)> f) {
         .pSwapchains = &res.swapchain,
         .pImageIndices = &res.curr,
     };
-    CHECKRE(vkQueuePresentKHR(queue, &info));
+    (vkQueuePresentKHR(queue, &info));
   }
 }

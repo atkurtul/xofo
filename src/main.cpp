@@ -9,48 +9,59 @@
 #include <memory>
 
 int main() {
+  Box<Pipeline> pipeline(new Pipeline("shaders/shader"));
 
-  Pipeline pipeline("shaders/shader");
-
-  VkDescriptorSet set = pipeline.alloc_set(0);
-  Buffer uniform(1024, Buffer::Uniform, Buffer::Mapped);
-
-  u64 isz = 0, vsz = 0;
+  auto uniform = Buffer::mk(1024, Buffer::Uniform, Buffer::Mapped);
 
   Box<Buffer> buffer;
-  Texture texture("models/car/posx.jpg", VK_FORMAT_R8G8B8A8_SRGB);
+  // Texture texture("models/car/posx.jpg", VK_FORMAT_R8G8B8A8_SRGB);
+  // auto texture = Texture::mk("blue.png", VK_FORMAT_R8G8B8A8_SRGB);
 
-  VkDescriptorSet texture_set = pipeline.alloc_set(1);
-  texture.image->bind_to_set(texture_set);
+  vector<Mesh> meshes;
+  vector<Material> mats;
+  vector<VkDescriptorSet> sets;
+
   {
     // MeshLoader mesh_loader("teapot.obj", 32);
-    // MeshLoader mesh_loader("batman/0.obj", 32);
-    MeshLoader mesh_loader("models/car/car.obj", 32);
+    //MeshLoader mesh_loader("models/scene_Scene.fbx", 32);
+    MeshLoader mesh_loader("models/doom/0.obj", 32);
+    // MeshLoader mesh_loader("models/car/car.obj", 32);
     mesh_loader.tex = 12;
     mesh_loader.norm = 20;
-    u64 buffer_size = mesh_loader.import();
-    isz = mesh_loader.isz;
-    vsz = mesh_loader.vsz;
+    meshes = mesh_loader.import();
 
-    buffer = make_unique<Buffer>(buffer_size,
-                                 Buffer::Vertex | Buffer::Index | Buffer::Dst,
-                                 Buffer::Unmapped);
+    buffer = Buffer::mk(mesh_loader.size,
+                        Buffer::Vertex | Buffer::Index | Buffer::Dst,
+                        Buffer::Unmapped);
 
-    Buffer staging(buffer_size, Buffer::Src, Buffer::Mapped);
-    mesh_loader.load(staging.mapping);
+    auto staging = Buffer::mk(mesh_loader.size, Buffer::Src, Buffer::Mapped);
+    mats = mesh_loader.load(staging->mapping);
+    sets.reserve(mats.size());
+    for (auto& mat : mats) {
+      auto set = pipeline->alloc_set(1);
+      if (mat.diffuse.has_value()) {
+        mat.diffuse.value()->bind_to_set(set, 0);
+      }
+      if (mat.normal.has_value()) {
+        mat.normal.value()->bind_to_set(set, 1);
+      }
+      sets.push_back(set);
+    }
 
     vk.execute([&](auto cmd) {
-      VkBufferCopy reg = {0, 0, buffer_size};
-      vkCmdCopyBuffer(cmd, staging, *buffer, 1, &reg);
+      VkBufferCopy reg = {0, 0, mesh_loader.size};
+      vkCmdCopyBuffer(cmd, *staging, *buffer, 1, &reg);
     });
   }
-
-  uniform.bind_to_set(set);
-  // uniform.copy(mat::perspective(90 * RADIAN, 800, 600, 0.01, 4000), 64);
-
+  cout << mats.size() <<  " " << sets.size() << "\n";
   u32 prev, curr = vk.res.frames.size() - 1;
-
-  Camera cam(800, 600);
+  auto cam_set = uniform->bind_to_set(pipeline->alloc_set(0), 0);
+  Camera cam(1600, 900);
+  vk.register_callback([&]() {
+    cam.set_prj(vk.res.extent.width, vk.res.extent.height);
+    pipeline.reset(new Pipeline("shaders/shader"));
+    cam_set = uniform->bind_to_set(pipeline->alloc_set(0), 0);
+  });
 
   while (vk.win.poll()) {
     auto mdelta = vk.win.mdelta * -0.0015f;
@@ -59,19 +70,22 @@ int main() {
     f32 s = vk.win.get_key('S');
     f32 d = vk.win.get_key('D');
 
-    uniform.copy(cam.update(mdelta, s - w, d - a));
+    uniform->copy(cam.update(mdelta, s - w, d - a));
 
     vk.draw([&](auto cmd) {
-      vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+      vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline);
 
-      VkDescriptorSet sets[] = {set, texture_set};
-      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline, 0,
-                              2, sets, 0, 0);
+      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
+                              0, 1, &cam_set, 0, 0);
 
-      u64 offset = 0;
-      vkCmdBindVertexBuffers(cmd, 0, 1, &buffer->buffer, &offset);
-      vkCmdBindIndexBuffer(cmd, *buffer, offset + vsz, VK_INDEX_TYPE_UINT32);
-      vkCmdDrawIndexed(cmd, isz / 4, 1, 0, 0, 0);
+      for (auto& mesh : meshes) {
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
+                                1, 1, &sets.at(mesh.mat), 0, 0);
+        vkCmdBindVertexBuffers(cmd, 0, 1, &buffer->buffer, &mesh.vertex_offset);
+        vkCmdBindIndexBuffer(cmd, *buffer, mesh.index_offset,
+                             VK_INDEX_TYPE_UINT32);
+        vkCmdDrawIndexed(cmd, mesh.indices / 4, 1, 0, 0, 0);
+      }
     });
   }
   CHECKRE(vkDeviceWaitIdle(vk));

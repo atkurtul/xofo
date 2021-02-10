@@ -1,4 +1,5 @@
 external
 build
+models
 .cache
 .vscode

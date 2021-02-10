@@ -1,67 +1,67 @@
 [
 {
-  "directory": "/home/atil/vk/build",
-  "command": "/usr/bin/c++   -I../include -I../external/include    -std=gnu++2a -o CMakeFiles/vk.dir/src/buffer.cpp.o -c /home/atil/vk/src/buffer.cpp",
-  "file": "/home/atil/vk/src/buffer.cpp"
+  "directory": "/home/atil/xofo/build",
+  "command": "/usr/bin/c++   -I../include -I../external/include  -pthread   -std=gnu++2a -o CMakeFiles/vk.dir/src/buffer.cpp.o -c /home/atil/xofo/src/buffer.cpp",
+  "file": "/home/atil/xofo/src/buffer.cpp"
 },
 
 {
-  "directory": "/home/atil/vk/build",
-  "command": "/usr/bin/c++   -I../include -I../external/include    -std=gnu++2a -o CMakeFiles/vk.dir/src/image.cpp.o -c /home/atil/vk/src/image.cpp",
-  "file": "/home/atil/vk/src/image.cpp"
+  "directory": "/home/atil/xofo/build",
+  "command": "/usr/bin/c++   -I../include -I../external/include  -pthread   -std=gnu++2a -o CMakeFiles/vk.dir/src/image.cpp.o -c /home/atil/xofo/src/image.cpp",
+  "file": "/home/atil/xofo/src/image.cpp"
 },
 
 {
-  "directory": "/home/atil/vk/build",
-  "command": "/usr/bin/c++   -I../include -I../external/include    -std=gnu++2a -o CMakeFiles/vk.dir/src/main.cpp.o -c /home/atil/vk/src/main.cpp",
-  "file": "/home/atil/vk/src/main.cpp"
+  "directory": "/home/atil/xofo/build",
+  "command": "/usr/bin/c++   -I../include -I../external/include  -pthread   -std=gnu++2a -o CMakeFiles/vk.dir/src/main.cpp.o -c /home/atil/xofo/src/main.cpp",
+  "file": "/home/atil/xofo/src/main.cpp"
 },
 
 {
-  "directory": "/home/atil/vk/build",
-  "command": "/usr/bin/c++   -I../include -I../external/include    -std=gnu++2a -o CMakeFiles/vk.dir/src/mesh_loader.cpp.o -c /home/atil/vk/src/mesh_loader.cpp",
-  "file": "/home/atil/vk/src/mesh_loader.cpp"
+  "directory": "/home/atil/xofo/build",
+  "command": "/usr/bin/c++   -I../include -I../external/include  -pthread   -std=gnu++2a -o CMakeFiles/vk.dir/src/mesh_loader.cpp.o -c /home/atil/xofo/src/mesh_loader.cpp",
+  "file": "/home/atil/xofo/src/mesh_loader.cpp"
 },
 
 {
-  "directory": "/home/atil/vk/build",
-  "command": "/usr/bin/c++   -I../include -I../external/include    -std=gnu++2a -o CMakeFiles/vk.dir/src/pipeline.cpp.o -c /home/atil/vk/src/pipeline.cpp",
-  "file": "/home/atil/vk/src/pipeline.cpp"
+  "directory": "/home/atil/xofo/build",
+  "command": "/usr/bin/c++   -I../include -I../external/include  -pthread   -std=gnu++2a -o CMakeFiles/vk.dir/src/pipeline.cpp.o -c /home/atil/xofo/src/pipeline.cpp",
+  "file": "/home/atil/xofo/src/pipeline.cpp"
 },
 
 {
-  "directory": "/home/atil/vk/build",
-  "command": "/usr/bin/c++   -I../include -I../external/include    -std=gnu++2a -o CMakeFiles/vk.dir/src/stb.cpp.o -c /home/atil/vk/src/stb.cpp",
-  "file": "/home/atil/vk/src/stb.cpp"
+  "directory": "/home/atil/xofo/build",
+  "command": "/usr/bin/c++   -I../include -I../external/include  -pthread   -std=gnu++2a -o CMakeFiles/vk.dir/src/stb.cpp.o -c /home/atil/xofo/src/stb.cpp",
+  "file": "/home/atil/xofo/src/stb.cpp"
 },
 
 {
-  "directory": "/home/atil/vk/build",
-  "command": "/usr/bin/c++   -I../include -I../external/include    -std=gnu++2a -o CMakeFiles/vk.dir/src/texture.cpp.o -c /home/atil/vk/src/texture.cpp",
-  "file": "/home/atil/vk/src/texture.cpp"
+  "directory": "/home/atil/xofo/build",
+  "command": "/usr/bin/c++   -I../include -I../external/include  -pthread   -std=gnu++2a -o CMakeFiles/vk.dir/src/texture.cpp.o -c /home/atil/xofo/src/texture.cpp",
+  "file": "/home/atil/xofo/src/texture.cpp"
 },
 
 {
-  "directory": "/home/atil/vk/build",
-  "command": "/usr/bin/c++   -I../include -I../external/include    -std=gnu++2a -o CMakeFiles/vk.dir/src/util.cpp.o -c /home/atil/vk/src/util.cpp",
-  "file": "/home/atil/vk/src/util.cpp"
+  "directory": "/home/atil/xofo/build",
+  "command": "/usr/bin/c++   -I../include -I../external/include  -pthread   -std=gnu++2a -o CMakeFiles/vk.dir/src/util.cpp.o -c /home/atil/xofo/src/util.cpp",
+  "file": "/home/atil/xofo/src/util.cpp"
 },
 
 {
-  "directory": "/home/atil/vk/build",
-  "command": "/usr/bin/c++   -I../include -I../external/include    -std=gnu++2a -o CMakeFiles/vk.dir/src/vk.cpp.o -c /home/atil/vk/src/vk.cpp",
-  "file": "/home/atil/vk/src/vk.cpp"
+  "directory": "/home/atil/xofo/build",
+  "command": "/usr/bin/c++   -I../include -I../external/include  -pthread   -std=gnu++2a -o CMakeFiles/vk.dir/src/vk.cpp.o -c /home/atil/xofo/src/vk.cpp",
+  "file": "/home/atil/xofo/src/vk.cpp"
 },
 
 {
-  "directory": "/home/atil/vk/build",
-  "command": "/usr/bin/c++   -I../include -I../external/include    -std=gnu++2a -o CMakeFiles/vk.dir/src/vma.cpp.o -c /home/atil/vk/src/vma.cpp",
-  "file": "/home/atil/vk/src/vma.cpp"
+  "directory": "/home/atil/xofo/build",
+  "command": "/usr/bin/c++   -I../include -I../external/include  -pthread   -std=gnu++2a -o CMakeFiles/vk.dir/src/vma.cpp.o -c /home/atil/xofo/src/vma.cpp",
+  "file": "/home/atil/xofo/src/vma.cpp"
 },
 
 {
-  "directory": "/home/atil/vk/build",
-  "command": "/usr/bin/c++   -I../include -I../external/include    -std=gnu++2a -o CMakeFiles/vk.dir/src/window.cpp.o -c /home/atil/vk/src/window.cpp",
-  "file": "/home/atil/vk/src/window.cpp"
+  "directory": "/home/atil/xofo/build",
+  "command": "/usr/bin/c++   -I../include -I../external/include  -pthread   -std=gnu++2a -o CMakeFiles/vk.dir/src/window.cpp.o -c /home/atil/xofo/src/window.cpp",
+  "file": "/home/atil/xofo/src/window.cpp"
 }
 ]

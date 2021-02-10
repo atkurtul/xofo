@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.16)
 project(abc)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_CXX_FLAGS "")
+set(CMAKE_CXX_FLAGS "-pthread")
 file(GLOB src "src/*.cpp")
 
 add_executable(vk ${src})

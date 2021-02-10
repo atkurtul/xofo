@@ -7,6 +7,7 @@ struct Pipeline {
   VkPipeline pipeline;
   std::vector<VkDescriptorSetLayout> set_layouts;
   std::vector<VkDescriptorPool> pools;
+
   
   operator VkPipeline() { return pipeline; }
   operator VkPipelineLayout() { return layout; }

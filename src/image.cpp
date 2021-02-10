@@ -1,18 +1,19 @@
 #include "image.h"
 #include <vk.h>
 #include <vulkan/vulkan_core.h>
+#include <memory>
 
 #include <unordered_map>
 unordered_map<u64, VkSampler> samplers;
 
 void destroy_samplers() {
-  for(auto [k,v]:samplers) {
-    (vkDestroySampler(vk, v, 0));
+  for (auto [k, v] : samplers) {
+    vkDestroySampler(vk, v, 0);
   }
 }
 
 static VkSampler create_sampler(VkSamplerAddressMode mode, uint mip) {
-  u64 key = ((u64)mode << 32 | mip);
+  u64 key = ((u64)mode << 32) | mip;
   auto existing = samplers.find(key);
   if (existing != samplers.end())
     return existing->second;
@@ -31,19 +32,19 @@ static VkSampler create_sampler(VkSamplerAddressMode mode, uint mip) {
       .maxLod = (float)mip,
       .borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
   };
-  
+
   VkSampler sampler;
   CHECKRE(vkCreateSampler(vk, &info, 0, &sampler));
   return samplers[key] = sampler;
 }
-
 
 void Image::type_layout(VkImageUsageFlags usage,
                         VkDescriptorType& type,
                         VkImageLayout& layout) {
   switch (usage & (Sampled | Storage | Color | DepthStencil | Input)) {
     case Sampled:
-      type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+      //type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+      type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
       layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
       break;
     case Storage:
@@ -65,13 +66,20 @@ void Image::type_layout(VkImageUsageFlags usage,
   }
 }
 
-Image::Image(VkFormat format,
-             VkImageUsageFlags usage,
-             VkExtent2D extent,
-             u32 mip,
-             VkSampleCountFlagBits ms,
-             VkImageAspectFlags aspect) {
+Box<Image> Image::mk(VkFormat format,
+                     VkImageUsageFlags usage,
+                     VkExtent2D extent,
+                     u32 mip,
+                     VkSampleCountFlagBits ms,
+                     VkImageAspectFlags aspect) {
   // VkImage handle = MkVkImage(format, usage, extent, mip, ms);
+
+  VkImage image;
+  VmaAllocation allocation;
+  VkDescriptorType type;
+  VkImageLayout layout;
+  VkImageView view;
+  VkSampler sampler;
 
   VkImageCreateInfo info = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -89,8 +97,9 @@ Image::Image(VkFormat format,
   VmaAllocationCreateInfo allocation_info = {.usage =
                                                  VMA_MEMORY_USAGE_GPU_ONLY};
   VmaAllocationInfo out_info;
-  CHECKRE(vmaCreateImage(vk, &info, &allocation_info, &image,
-                                &allocation, &out_info));
+
+  CHECKRE(vmaCreateImage(vk, &info, &allocation_info, &image, &allocation,
+                         &out_info));
 
   VkImageViewCreateInfo view_info = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -107,6 +116,15 @@ Image::Image(VkFormat format,
   type_layout(usage, type, layout);
 
   sampler = create_sampler(VK_SAMPLER_ADDRESS_MODE_REPEAT, mip);
+
+  return Box<Image>(new Image{
+      .allocation = allocation,
+      .image = image,
+      .view = view,
+      .sampler = sampler,
+      .type = type,
+      .layout = layout,
+  });
 }
 
 Image::~Image() {
@@ -115,19 +133,21 @@ Image::~Image() {
   vmaFreeMemory(vk, allocation);
 }
 
-void Image::bind_to_set(VkDescriptorSet set) {
+VkDescriptorSet Image::bind_to_set(VkDescriptorSet set, u32 bind) {
   VkDescriptorImageInfo info = {
-      .sampler = sampler,
+      //.sampler = sampler,
       .imageView = view,
       .imageLayout = layout,
   };
 
   VkWriteDescriptorSet write = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                                 .dstSet = set,
-                                .dstBinding = 0,
+                                .dstBinding = bind,
                                 .descriptorCount = 1,
                                 .descriptorType = type,
                                 .pImageInfo = &info};
 
   vkUpdateDescriptorSets(vk, 1, &write, 0, 0);
+
+  return set;
 }

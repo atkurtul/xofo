@@ -12,10 +12,6 @@
 
 using namespace std;
 
-
-template <class T>
-using Box = unique_ptr<T>;
-
 struct Resources {
   VkCommandPool pool;
   VkSwapchainKHR swapchain;
@@ -45,13 +41,7 @@ struct Resources {
 extern struct Vk {
   inline static const char* layer[] = {"VK_LAYER_KHRONOS_validation"};
 
-  VkInstance instance;
-  VkDevice dev;
-  VkPhysicalDevice pdev;
-  VkQueue queue;
-  VmaAllocator allocator;
-  Window win;
-  Resources res;
+
 
   Vk();
   ~Vk();
@@ -71,13 +61,22 @@ extern struct Vk {
   VkCommandBuffer get_cmd();
 
   void submit_cmd(VkCommandBuffer cmd);
-  static void init();
-
-  void draw(std::function<void(VkCommandBuffer)>);
+  void register_callback(function<void()> f) {
+    callbacks.push_back(move(f));
+  }
+  void draw(function<void(VkCommandBuffer)> const&);
 
  private:
   void init_device();
-
+  vector<function<void()>> callbacks;
+  VkInstance instance;
+  VkDevice dev;
+  VkPhysicalDevice pdev;
+  VkQueue queue;
+  VmaAllocator allocator;
+public:
+  Window win;
+  Resources res;
 } vk;
 
 #endif /* E7CD5CCF_D975_419F_81AE_1FAAB38BA0F3 */

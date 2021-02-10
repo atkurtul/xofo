@@ -150,8 +150,11 @@ auto extract_input_state_and_uniforms(
                     stage, bindings);
   build_set_layouts(cc, res.storage_images, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
                     stage, bindings);
-  build_set_layouts(cc, res.sampled_images, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+  build_set_layouts(cc, res.sampled_images,
+                    //VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 
+                    VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 
                     stage, bindings);
+
   struct {
     vector<VkVertexInputAttributeDescription> attr;
     u32 stride;
@@ -165,12 +168,16 @@ Pipeline::Pipeline(string const& shader) {
       .binding = 0, .inputRate = VK_VERTEX_INPUT_RATE_VERTEX};
 
   VkPipelineShaderStageCreateInfo stages[2];
-  auto bin0 = compile_shader(vk, shader + ".vert", shaderc_vertex_shader, stages[0]);
-  auto bin1 = compile_shader(vk, shader + ".frag", shaderc_fragment_shader, stages[1]);
+  auto bin0 =
+      compile_shader(vk, shader + ".vert", shaderc_vertex_shader, stages[0]);
+  auto bin1 =
+      compile_shader(vk, shader + ".frag", shaderc_fragment_shader, stages[1]);
 
   vector<vector<VkDescriptorSetLayoutBinding>> bindings;
-  auto [attr, stride] = extract_input_state_and_uniforms(bin0, VK_SHADER_STAGE_VERTEX_BIT, bindings);
-  extract_input_state_and_uniforms(bin1, VK_SHADER_STAGE_FRAGMENT_BIT, bindings);
+  auto [attr, stride] = extract_input_state_and_uniforms(
+      bin0, VK_SHADER_STAGE_VERTEX_BIT, bindings);
+  extract_input_state_and_uniforms(bin1, VK_SHADER_STAGE_FRAGMENT_BIT,
+                                   bindings);
   VkVertexInputBindingDescription binding = {
       .stride = stride,
   };

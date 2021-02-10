@@ -33,10 +33,11 @@ struct Buffer {
 
   ~Buffer();
 
-  Buffer(size_t size, VkBufferUsageFlags usage, Mapping);
+  static Box<Buffer> mk(size_t size, VkBufferUsageFlags usage, Mapping);
 
 
-  void bind_to_set(VkDescriptorSet set) ;
+  VkDescriptorSet bind_to_set(VkDescriptorSet set, u32 bind);
+
 };
 
 #endif /* D8F23374_2F16_4692_A5AE_7D3369B8E620 */

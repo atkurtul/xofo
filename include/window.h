@@ -5,9 +5,7 @@
 
 
 struct Window {
-#ifdef __linux
   struct GLFWwindow* glfw;
-#endif
   vec2 mpos;
   vec2 mdelta;
   double time = 0;

@@ -1,7 +1,12 @@
-#include <mesh_loader.h>
+#include "texture.h"
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
+#include <assimp/types.h>
+#include <mesh_loader.h>
 #include <assimp/Importer.hpp>
+#include <iostream>
+#include <unordered_map>
+using namespace std;
 
 MeshLoader::MeshLoader(const char* file, u32 stride)
     : file(file),
@@ -17,48 +22,90 @@ MeshLoader::~MeshLoader() {
   delete importer;
 }
 
-u64 MeshLoader::import() {
-  scene = importer->ReadFile(file, aiProcess_Triangulate | 
-  aiProcess_FlipUVs |
-  aiProcess_GenSmoothNormals |
-  aiProcess_CalcTangentSpace |
-  aiProcess_LimitBoneWeights);
-  
-  isz = 0;
-  vsz = 0;
+std::vector<Mesh> MeshLoader::import() {
+  scene = importer->ReadFile(file, aiProcess_Triangulate | aiProcess_FlipUVs |
+                                       aiProcess_GenSmoothNormals |
+                                       aiProcess_CalcTangentSpace |
+                                       aiProcess_LimitBoneWeights);
+  size = 0;
+  std::vector<Mesh> meshes;
   for (u32 i = 0; i < scene->mNumMeshes; ++i) {
     struct aiMesh* mesh = scene->mMeshes[i];
-    isz += mesh->mNumFaces * 12;
-    vsz += mesh->mNumVertices * stride;
+
+    u64 indices = mesh->mNumFaces * 12;
+    u64 vertices = mesh->mNumVertices * stride;
+    Mesh mm = {
+        .vertex_offset = size,
+        .index_offset = size + vertices,
+        .indices = indices,
+        .vertices = vertices,
+        .mat = mesh->mMaterialIndex,
+    };
+    size += indices + vertices;
+    meshes.push_back(mm);
   }
-  return isz + vsz;
+
+  return meshes;
 }
 
-void MeshLoader::load(void* buffer) {
-  auto vertices = (char*)buffer;
-  auto indices = vertices + vsz;
-  u32 offset = 0;
-  u32 ioffset = 0;
+std::vector<Material> MeshLoader::load(char* buffer) {
+  unordered_map<const char*, Rc<Texture>> textures;
+  std::vector<Material> mats;
+
+  string base = file;
+
+  base.erase(base.begin() + base.find_last_of("/") + 1, base.end());
+  Rc<Texture> defo(Texture::mk("blue.png", VK_FORMAT_R8G8B8A8_SRGB).release());
+  for (u32 i = 0; i < scene->mNumMaterials; ++i) {
+    Material mmat;
+    aiString path;
+    auto mat = scene->mMaterials[i];
+
+    aiColor3D color;
+    if (aiReturn_SUCCESS == mat->Get(AI_MATKEY_COLOR_DIFFUSE, color)) {
+      mmat.color = vec3{color.r, color.g, color.b};
+    }
+    if (aiReturn_SUCCESS == mat->GetTexture(aiTextureType_DIFFUSE, 0, &path)) {
+      string rpath = base + path.C_Str();
+      if (textures.find(path.C_Str()) == textures.end()) {
+        textures[path.C_Str()] =
+            Rc<Texture>(Texture::mk(rpath, VK_FORMAT_R8G8B8A8_SRGB).release());
+      }
+      mmat.diffuse = textures[path.C_Str()];
+    } else {
+      mmat.diffuse = defo;
+    }
+    if (aiReturn_SUCCESS == mat->GetTexture(aiTextureType_HEIGHT, 0, &path)) {
+      if (textures.find(path.C_Str()) == textures.end()) {
+        textures[path.C_Str()] = Rc<Texture>(
+            Texture::mk(path.C_Str(), VK_FORMAT_R8G8B8A8_UNORM).release());
+      }
+      mmat.normal = textures[path.C_Str()];
+    }
+    mats.push_back(mmat);
+  }
+
   for (u32 i = 0; i < scene->mNumMeshes; ++i) {
     struct aiMesh* mesh = scene->mMeshes[i];
+    for (u32 j = 0; j < mesh->mNumVertices; ++j) {
+      memcpy(buffer, mesh->mVertices + j, 12);
+      if (tex && mesh->mTextureCoords[0])
+        memcpy(buffer + tex, mesh->mTextureCoords[0] + j, 8);
+      if (norm && mesh->mNormals)
+        memcpy(buffer + norm, mesh->mNormals + j, 12);
+      if (norm1 && mesh->mTangents)
+        memcpy(buffer + norm1, mesh->mTangents + j, 12);
+      if (norm2 && mesh->mBitangents)
+        memcpy(buffer + norm2, mesh->mBitangents + j, 12);
+      buffer += stride;
+    }
+
     for (u32 j = 0; j < mesh->mNumFaces; ++j) {
       void* aidx = mesh->mFaces[j].mIndices;
-      memcpy(indices + ioffset, aidx, 12);
-      ioffset += 12;
-    }
-    u32 size = mesh->mNumVertices;
-    for (u32 j = 0; j < mesh->mNumVertices; ++j) {
-      u32 curr = offset * stride;
-      memcpy(vertices + curr, mesh->mVertices + j, 12);
-      if (tex && mesh->mTextureCoords[0])
-        memcpy(vertices + curr + tex, mesh->mTextureCoords[0] + j, 8);
-      if (norm && mesh->mNormals)
-        memcpy(vertices + curr + norm, mesh->mNormals + j, 12);
-      if (norm1 && mesh->mTangents)
-        memcpy(vertices + curr + norm1, mesh->mTangents + j, 12);
-      if (norm2 && mesh->mBitangents)
-        memcpy(vertices + curr + norm2, mesh->mBitangents + j, 12);
-      offset++;
+      memcpy(buffer, aidx, 12);
+      buffer += 12;
     }
   }
+
+  return mats;
 }

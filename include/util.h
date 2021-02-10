@@ -3,14 +3,26 @@
 #include <typedefs.h>
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
+#include <memory>
+#include <optional>
+
+
+
+template <class T>
+using Box = std::unique_ptr<T>;
+template <class T>
+using Rc = std::shared_ptr<T>;
+template <class T>
+using Opt = std::optional<T>;
+
 const char* vk_result_string(VkResult re);
 
 #define CHECKRE(expr)                                                          \
   {                                                                            \
     VkResult re = (expr);                                                      \
     if (re) {                                                                  \
-      printf("Error: %s\n %s %d\n", vk_result_string(re), __FILE__, __LINE__); \
-      exit(1);                                                                 \
+      printf("Error: %s\n %s:%d\n", vk_result_string(re), __FILE__, __LINE__); \
+      abort();                                                                 \
     }                                                                          \
   }
 #endif /* E7EA5D0B_5989_44BF_A123_639B65E5D7ED */

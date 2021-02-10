@@ -27,16 +27,17 @@ struct Image {
   static void type_layout(VkImageUsageFlags usage,
                           VkDescriptorType& type,
                           VkImageLayout& layout);
-  Image(VkFormat format,
-        VkImageUsageFlags usage,
-        VkExtent2D extent,
-        u32 mip,
-        VkSampleCountFlagBits ms,
-        VkImageAspectFlags aspect);
+
+  static Box<Image> mk(VkFormat format,
+                       VkImageUsageFlags usage,
+                       VkExtent2D extent,
+                       u32 mip,
+                       VkSampleCountFlagBits ms,
+                       VkImageAspectFlags aspect);
 
   ~Image();
 
-  void bind_to_set(VkDescriptorSet set);
+  VkDescriptorSet bind_to_set(VkDescriptorSet set, u32 bind);
 };
 
 #endif /* B4289538_0D44_47DC_927C_CB5FB0CAE07A */

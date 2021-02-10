@@ -6,9 +6,8 @@
 #include <memory>
 
 
-struct Texture  {
-  std::unique_ptr<Image> image;
-  Texture(std::string const& file, VkFormat format);
+struct Texture : Image  {
+  static Box<Texture> mk(std::string file, VkFormat format);
 };
 
 
