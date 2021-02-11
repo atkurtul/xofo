@@ -18,7 +18,10 @@ struct MeshLoader {
   MeshLoader(const char* file, u32 stride);
   std::vector<xofo::Mesh>  import();
 
-  std::vector<xofo::Material> load(char* buffer);
+  std::vector<xofo::Material> load_materials();
+
+  void load_geometry(char* buffer);
+
   ~MeshLoader();
 };
 

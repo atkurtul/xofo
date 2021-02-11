@@ -3,7 +3,7 @@
 
 #include <buffer.h>
 #include <image.h>
-#include <texture.h>
+
 #include <pipeline.h>
 
 #include <mesh_loader.h>

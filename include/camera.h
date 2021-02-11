@@ -19,6 +19,7 @@ struct Camera {
   }
 
   void update(vec2 md, f32 fwd, f32 lr, f32 dt) {
+
     pos = (pos + ori[2] * fwd * dt + ori[0] * lr * dt);
     ori = ori * angax(md.y, ori[0].xyz) * angax(md.x, vec3(0, 1, 0));
 

@@ -6,19 +6,43 @@ namespace xofo {
 
 struct Shader {
   std::vector<u32> bytecode;
-  VkShaderModule module;
+  VkShaderModule mod;
+
+  operator VkShaderModule() const { return mod; }
+};
+
+struct SetLayout {
+  VkDescriptorSetLayout layout;
+  std::vector<VkDescriptorType> bindings;
+
+  operator VkDescriptorSetLayout() const { return layout; }
+
+  SetLayout(std::vector<VkDescriptorSetLayoutBinding> const& bindings) {
+    VkDescriptorSetLayoutCreateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .bindingCount = (u32)bindings.size(),
+        .pBindings = bindings.data(),
+    };
+    CHECKRE(vkCreateDescriptorSetLayout(vk, &info, 0, &layout));
+
+    for (auto& binding : bindings) {
+      this->bindings.push_back(binding.descriptorType);
+    }
+  }
 };
 
 struct Pipeline {
   std::string shader;
   VkPipelineLayout layout;
   VkPipeline pipeline;
-  std::vector<VkDescriptorSetLayout> set_layouts;
-  std::vector<VkDescriptorPool> pools;
 
+  std::vector<SetLayout> set_layouts;
+  std::vector<VkDescriptorPool> pools;
   std::vector<VkVertexInputAttributeDescription> attr;
+
   u32 stride;
-  VkShaderModule modules[2];
+  Shader shaders[2];
+
   operator VkPipeline() { return pipeline; }
   operator VkPipelineLayout() { return layout; }
   void create();

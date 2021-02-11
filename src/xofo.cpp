@@ -5,7 +5,6 @@
 #include <xofo.h>
 #include <memory>
 
-
 #include <GLFW/glfw3.h>
 
 #include <imgui_impl_glfw.h>
@@ -15,7 +14,6 @@ using namespace xofo;
 using namespace std;
 
 static VkDescriptorPool g_imgui_pool;
-
 static VkInstance g_instance;
 static VkDevice g_dev;
 static VkPhysicalDevice g_pdev;
@@ -26,6 +24,7 @@ static VkSurfaceKHR g_surface;
 static vec4 g_color = vec4{0.2, 0.4, 0.8, 1};
 static vector<function<void(VkExtent2D)>> g_callbacks;
 static vector<function<void()>> g_destructors;
+static unordered_map<u64, VkSampler> g_samplers;
 
 static vec2 g_mpos;
 static vec2 g_mdelta;
@@ -134,9 +133,8 @@ struct {
 
     depth_buffer =
         Image::mk(VK_FORMAT_D32_SFLOAT, Image::DepthStencil | Image::Transient,
-                  extent, 1, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_ASPECT_DEPTH_BIT);
+                  extent, 1, Image::Type::DepthBuffer);
 
-    // renderpass
     VkAttachmentDescription desc[2] = {
         {
             .format = fmt.format,
@@ -325,8 +323,6 @@ static void init_imgui() {
   }
 }
 
-extern void destroy_samplers();
-
 void xofo::recreate() {
   vkDeviceWaitIdle(vk);
   g_res.free();
@@ -490,12 +486,9 @@ bool xofo::mbutton(int lr) {
   return glfwGetMouseButton(g_glfw, lr);
 }
 
-void xofo::hide_mouse() {
-  glfwSetInputMode(g_glfw, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-}
-
-void xofo::unhide_mouse() {
-  glfwSetInputMode(g_glfw, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+void xofo::hide_mouse(bool state) {
+  glfwSetInputMode(g_glfw, GLFW_CURSOR,
+                   state ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
 }
 
 int xofo::poll() {
@@ -559,7 +552,9 @@ void deinit() {
 
   vmaDestroyAllocator(vk);
 
-  destroy_samplers();
+  for (auto [k, v] : g_samplers) {
+    vkDestroySampler(vk, v, 0);
+  }
 
   vkDestroyDevice(vk, 0);
 
@@ -653,4 +648,30 @@ void xofo::init() {
 
 void xofo::at_exit(const std::function<void()>& f) {
   g_destructors.push_back(f);
+}
+
+VkSampler xofo::create_sampler(VkSamplerAddressMode mode, uint mip) {
+  u64 key = ((u64)mode << 32) | mip;
+  auto existing = g_samplers.find(key);
+  if (existing != g_samplers.end())
+    return existing->second;
+
+  VkSamplerCreateInfo info = {
+      .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+      .magFilter = VK_FILTER_LINEAR,
+      .minFilter = VK_FILTER_LINEAR,
+      .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+      .addressModeU = mode,
+      .addressModeV = mode,
+      .addressModeW = mode,
+      //.anisotropyEnable = 1,
+      //.maxAnisotropy = 1,
+      .compareOp = VK_COMPARE_OP_NEVER,
+      .maxLod = (float)mip,
+      .borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
+  };
+
+  VkSampler sampler;
+  CHECKRE(vkCreateSampler(vk, &info, 0, &sampler));
+  return g_samplers[key] = sampler;
 }

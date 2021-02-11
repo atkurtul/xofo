@@ -1,7 +1,7 @@
+
 #include <xofo.h>
 
 using namespace std;
-
 
 template <class F>
 void imgui_win(const char* title, F&& f) {
@@ -35,6 +35,7 @@ void integrate_lights(f32 dt, vector<Light>& lights, vector<vec3>& meta) {
 }
 
 void make_lights(u32 n, f32 r, vector<Light>& lights, vector<vec3>& meta) {
+  n = 1;
   lights.clear();
   lights.resize(n);
   meta.resize(n);
@@ -44,11 +45,48 @@ void make_lights(u32 n, f32 r, vector<Light>& lights, vector<vec3>& meta) {
     meta.z = r * (float(rand() % 255) / 255.f + 0.01);
   }
 }
+using namespace xofo;
+
+struct CubeMap {
+  Box<Texture> texture;
+  Box<Buffer> buffer;
+  VkDescriptorSet set;
+  Mesh mesh;
+
+  CubeMap(Pipeline& pipeline) {
+    MeshLoader mesh_loader("models/cube.gltf", pipeline.stride);
+    mesh_loader.tex = 12;
+
+    auto meshes = mesh_loader.import();
+    if (meshes.size() != 1)
+      abort();
+
+    mesh = meshes[0];
+    
+    auto buffer = Buffer::mk(mesh_loader.size,
+                             Buffer::Vertex | Buffer::Index | Buffer::Dst,
+                             Buffer::Unmapped);
+
+    auto staging = Buffer::mk(mesh_loader.size, Buffer::Src, Buffer::Mapped);
+    mesh_loader.load_geometry(staging->mapping);
+
+    xofo::execute([&](auto cmd) {
+      VkBufferCopy reg = {0, 0, mesh_loader.size};
+      vkCmdCopyBuffer(cmd, *staging, *buffer, 1, &reg);
+    });
+
+    auto texture = load_cubemap("models/cubemap_yokohama_rgba.ktx",
+                                VK_FORMAT_R8G8B8A8_SRGB);
+    set = pipeline.alloc_set(0);
+    texture->bind_to_set(set, 0);
+  };
+};
 
 int main() {
   xofo::init();
   Box<xofo::Pipeline> pipeline(new xofo::Pipeline("shaders/shader"));
-
+  Box<xofo::Pipeline> skybox(new xofo::Pipeline("shaders/skybox"));
+  CubeMap cube_map(*skybox);
   auto uniform =
       xofo::Buffer::mk(65536, xofo::Buffer::Uniform, xofo::Buffer::Mapped);
 
@@ -56,8 +94,8 @@ int main() {
   xofo::Model model1("models/doom/0.obj", *pipeline);
   xofo::Model model2("models/batman/0.obj", *pipeline);
   xofo::Model model3("models/heavy_assault_rifle/scene.gltf", *pipeline);
-
   model0.scale = 0.01;
+
   u32 prev, curr = xofo::buffer_count() - 1;
 
   auto cam_set = uniform->bind_to_set(pipeline->alloc_set(0), 0);
@@ -69,30 +107,27 @@ int main() {
     pipeline->reset();
   });
 
-  vector<Light> lights;
-  vector<vec3> meta;
-  u32 n_lights = 16;
-  f32 radius = 8;
-  make_lights(n_lights, radius, lights, meta);
-
   mat m3(0.1);
   vec4 ax(0, 0, 0, 1);
   vec3 xxf(0);
 
+  Light light;
+  vec3 meta = vec3{0.f, 1.f, 16.f};
   string read_to_string(const char* file);
 
   while (xofo::poll()) {
     double dt = xofo::dt();
-
-    integrate_lights(dt, lights, meta);
-
     auto mdelta = xofo::mdelta() * -0.0012f;
-    if (!xofo::mbutton(1)) {
+
+    if (xofo::mbutton(1))
+      xofo::hide_mouse(1);
+    else {
+      xofo::hide_mouse(0);
       mdelta = {};
-      xofo::unhide_mouse();
-    } else {
-      xofo::hide_mouse();
     }
+
+    light.integrate(meta, dt);
+
     f32 w = xofo::get_key('W');
     f32 a = xofo::get_key('A');
     f32 s = xofo::get_key('S');
@@ -100,8 +135,7 @@ int main() {
     cam.update(mdelta, s - w, d - a, dt * 5);
 
     uniform->copy(cam.pos);
-    uniform->copy(vec4i(lights.size()), 16);
-    uniform->copy(lights.size() * sizeof(vec4[2]), lights.data(), 32);
+    uniform->copy(light, 16);
 
     if (xofo::get_key('E') | 1) {
       auto xf = mat(1);
@@ -119,12 +153,17 @@ int main() {
 
           vkCmdPushConstants(cmd, *pipeline, 17, 0, 64, &cam.view);
           vkCmdPushConstants(cmd, *pipeline, 17, 64, 64, &cam.prj);
+
           model0.draw(cmd, *pipeline, mat(0.01));
           model1.draw(cmd, *pipeline, mat(1));
           auto id = mat(1);
           id.translate(-vec3(1, 0, 1));
           model2.draw(cmd, *pipeline, id);
           model3.draw(cmd, *pipeline, m3);
+
+          vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *skybox);
+          vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *skybox,
+                                  0, 1, &cube_map.set, 0, 0);
         },
         [&]() {
           imgui_win("Pipeline state", [&]() {
@@ -154,10 +193,10 @@ int main() {
             ImGui::DragFloat4("Angle Axis  0", (float*)&ax, 0.005, -10, 10);
             ImGui::DragFloat3("Offset", (float*)&xxf, 0.05, -2, 2);
 
-            if (ImGui::SliderInt("Number of lights", (i32*)&n_lights, 0, 64) ||
-                ImGui::SliderFloat("Average radius", &radius, 4, 1024)) {
-              make_lights(n_lights, radius, lights, meta);
-            }
+            ImGui::DragFloat3("Light color", (float*)&light.color, 0.05, 0,
+                              1.f);
+            ImGui::DragFloat("Light speed", &meta.y, 0.05, 0, 16.f);
+            ImGui::DragFloat("Light radius", &meta.z, 0.05, 0, 16.f);
           });
         });
   }

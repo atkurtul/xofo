@@ -1,5 +1,6 @@
 #include <vulkan/vulkan_core.h>
 #include <xofo.h>
+#include <algorithm>
 
 #include <fstream>
 #include <unordered_map>
@@ -71,19 +72,17 @@ static VkFormat type_format(int basetype, int vecsize) {
   throw;
 }
 
-static vector<u32> compile_shader(string const& file,
-                                  shaderc_shader_kind stage,
-                                  VkShaderModule& module) {
-  auto bin = compile_glsl(file.c_str(), stage);
+static Shader compile_shader(string const& file, shaderc_shader_kind stage) {
+  Shader shader = {.bytecode = compile_glsl(file.c_str(), stage)};
 
   VkShaderModuleCreateInfo module_info = {
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-      .codeSize = bin.size() * 4,
-      .pCode = bin.data()};
+      .codeSize = shader.bytecode.size() * 4,
+      .pCode = shader.bytecode.data()};
 
-  CHECKRE(vkCreateShaderModule(vk, &module_info, 0, &module));
+  CHECKRE(vkCreateShaderModule(vk, &module_info, 0, &shader.mod));
 
-  return move(bin);
+  return shader;
 }
 
 namespace sc = spirv_cross;
@@ -169,32 +168,38 @@ static ShaderData extract_input_state_and_uniforms(
   return {attr, stride};
 }
 
-Pipeline::Pipeline(string const& shader) : shader(shader) {
-  auto bin0 =
-      compile_shader(shader + ".vert", shaderc_vertex_shader, modules[0]);
-  auto bin1 =
-      compile_shader(shader + ".frag", shaderc_fragment_shader, modules[1]);
-
+Pipeline::Pipeline(string const& shader)
+    : shader(shader),
+      shaders{
+          compile_shader(shader + ".vert", shaderc_vertex_shader),
+          compile_shader(shader + ".frag", shaderc_fragment_shader),
+      } {
   vector<vector<VkDescriptorSetLayoutBinding>> bindings;
 
   auto shader_data = extract_input_state_and_uniforms(
-      bin0, VK_SHADER_STAGE_VERTEX_BIT, bindings);
+      shaders[0].bytecode, VK_SHADER_STAGE_VERTEX_BIT, bindings);
+
   this->attr = move(shader_data.attr);
   this->stride = shader_data.stride;
-  extract_input_state_and_uniforms(bin1, VK_SHADER_STAGE_FRAGMENT_BIT,
-                                   bindings);
+
+  extract_input_state_and_uniforms(shaders[1].bytecode,
+                                   VK_SHADER_STAGE_FRAGMENT_BIT, bindings);
 
   // decriptor pool
   for (auto& bindings : bindings) {
+    if (bindings.empty())
+      continue;
     unordered_map<VkDescriptorType, u32> sizes;
     vector<VkDescriptorPoolSize> pools;
     VkDescriptorPool pool;
     for (auto& bind : bindings) {
-      sizes[bind.descriptorType] += bind.descriptorCount * 4096;
+      sizes[bind.descriptorType] += bind.descriptorCount * 1024;
     }
+
     for (auto kv : sizes) {
       pools.push_back({kv.first, kv.second});
     }
+
     VkDescriptorPoolCreateInfo pinfo = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .maxSets = 4096,
@@ -206,16 +211,13 @@ Pipeline::Pipeline(string const& shader) : shader(shader) {
   }
 
   // set layouts
+  vector<VkDescriptorSetLayout> layouts;
+  layouts.reserve(bindings.size());
+  set_layouts.reserve(bindings.size());
 
   for (auto& bindings : bindings) {
-    VkDescriptorSetLayoutCreateInfo info = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .bindingCount = (u32)bindings.size(),
-        .pBindings = bindings.data(),
-    };
-    VkDescriptorSetLayout layout;
-    CHECKRE(vkCreateDescriptorSetLayout(vk, &info, 0, &layout));
-    set_layouts.push_back(layout);
+    set_layouts.emplace_back(bindings);
+    layouts.push_back(set_layouts.back().layout);
   }
 
   // pipeline layout
@@ -228,8 +230,8 @@ Pipeline::Pipeline(string const& shader) : shader(shader) {
 
   VkPipelineLayoutCreateInfo layout_info = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-      .setLayoutCount = (u32)set_layouts.size(),
-      .pSetLayouts = set_layouts.data(),
+      .setLayoutCount = (u32)layouts.size(),
+      .pSetLayouts = layouts.data(),
       .pushConstantRangeCount = 1,
       .pPushConstantRanges = &range,
   };
@@ -240,12 +242,10 @@ Pipeline::Pipeline(string const& shader) : shader(shader) {
 }
 
 void Pipeline::reload_shaders() {
-  vkDestroyShaderModule(vk, modules[0], 0);
-  vkDestroyShaderModule(vk, modules[1], 0);
-  auto bin0 =
-      compile_shader(shader + ".vert", shaderc_vertex_shader, modules[0]);
-  auto bin1 =
-      compile_shader(shader + ".frag", shaderc_fragment_shader, modules[1]);
+  vkDestroyShaderModule(vk, shaders[0], 0);
+  vkDestroyShaderModule(vk, shaders[1], 0);
+  shaders[0] = compile_shader(shader + ".vert", shaderc_vertex_shader);
+  shaders[1] = compile_shader(shader + ".frag", shaderc_fragment_shader);
   reset();
 }
 
@@ -254,13 +254,13 @@ void Pipeline::create() {
       {
           .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
           .stage = VK_SHADER_STAGE_VERTEX_BIT,
-          .module = modules[0],
+          .module = shaders[0],
           .pName = "main",
       },
       {
           .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
           .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-          .module = modules[1],
+          .module = shaders[1],
           .pName = "main",
       }};
 
@@ -354,7 +354,7 @@ VkDescriptorSet Pipeline::alloc_set(u32 n) {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
       .descriptorPool = pools[n],
       .descriptorSetCount = 1,
-      .pSetLayouts = &set_layouts[n],
+      .pSetLayouts = &set_layouts[n].layout,
   };
   VkDescriptorSet set;
   CHECKRE(vkAllocateDescriptorSets(vk, &info, &set));
@@ -362,9 +362,9 @@ VkDescriptorSet Pipeline::alloc_set(u32 n) {
 }
 
 Pipeline::~Pipeline() {
+  vkDestroyShaderModule(vk, shaders[0], 0);
+  vkDestroyShaderModule(vk, shaders[1], 0);
   vkDestroyPipeline(vk, pipeline, 0);
-  vkDestroyShaderModule(vk, modules[0], 0);
-  vkDestroyShaderModule(vk, modules[1], 0);
   vkDestroyPipelineLayout(vk, layout, 0);
   for (auto pool : pools) {
     vkDestroyDescriptorPool(vk, pool, 0);

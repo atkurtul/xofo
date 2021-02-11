@@ -28,14 +28,23 @@ struct Model {
                         Buffer::Unmapped);
 
     auto staging = Buffer::mk(mesh_loader.size, Buffer::Src, Buffer::Mapped);
-    mats = mesh_loader.load(staging->mapping);
+    mats = mesh_loader.load_materials();
+    mesh_loader.load_geometry(staging->mapping);
     sets.reserve(mats.size());
 
     for (auto& mat : mats) {
       auto set = pipeline.alloc_set(1);
-      mat.diffuse->bind_to_set(set, 0);
-      mat.normal->bind_to_set(set, 1);
-      mat.metallic->bind_to_set(set, 2);
+
+      switch (pipeline.set_layouts[1].bindings.size()) {
+        default:
+        case 3:
+          mat.metallic->bind_to_set(set, 2);
+        case 2:
+          mat.normal->bind_to_set(set, 1);
+        case 1:
+          mat.diffuse->bind_to_set(set, 0);
+        case 0: void();
+      }
       sets.push_back(set);
     }
 

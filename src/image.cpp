@@ -1,48 +1,12 @@
 #include "image.h"
-#include <xofo.h>
 #include <vulkan/vulkan_core.h>
+#include <xofo.h>
 #include <memory>
 
 #include <unordered_map>
 
-
 using namespace std;
 using namespace xofo;
-
-static unordered_map<u64, VkSampler> samplers;
-
-
-void destroy_samplers() {
-  for (auto [k, v] : samplers) {
-    vkDestroySampler(vk, v, 0);
-  }
-}
-
-static VkSampler create_sampler(VkSamplerAddressMode mode, uint mip) {
-  u64 key = ((u64)mode << 32) | mip;
-  auto existing = samplers.find(key);
-  if (existing != samplers.end())
-    return existing->second;
-
-  VkSamplerCreateInfo info = {
-      .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-      .magFilter = VK_FILTER_LINEAR,
-      .minFilter = VK_FILTER_LINEAR,
-      .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
-      .addressModeU = mode,
-      .addressModeV = mode,
-      .addressModeW = mode,
-      //.anisotropyEnable = 1,
-      //.maxAnisotropy = 1,
-      .compareOp = VK_COMPARE_OP_NEVER,
-      .maxLod = (float)mip,
-      .borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
-  };
-
-  VkSampler sampler;
-  CHECKRE(vkCreateSampler(vk, &info, 0, &sampler));
-  return samplers[key] = sampler;
-}
 
 void Image::type_layout(VkImageUsageFlags usage,
                         VkDescriptorType& type,
@@ -50,7 +14,7 @@ void Image::type_layout(VkImageUsageFlags usage,
   switch (usage & (Sampled | Storage | Color | DepthStencil | Input)) {
     case Sampled:
       type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-      //type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+      // type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
       layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
       break;
     case Storage:
@@ -71,20 +35,72 @@ void Image::type_layout(VkImageUsageFlags usage,
       break;
   }
 }
+Box<Image> Image::mk(VkImageCreateInfo const& info, Type type) {
+  VkImage image;
+  VmaAllocation allocation;
+  VkDescriptorType descriptor_type;
+  VkImageLayout layout;
+  VkImageView view;
+  VkSampler sampler;
+
+  VmaAllocationCreateInfo allocation_info = {.usage =
+                                                 VMA_MEMORY_USAGE_GPU_ONLY};
+  VmaAllocationInfo out_info;
+
+  CHECKRE(vmaCreateImage(vk, &info, &allocation_info, &image, &allocation,
+                         &out_info));
+
+  VkImageSubresourceRange subrange = {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .levelCount = 1,
+      .layerCount = 1,
+  };
+  auto view_type = VK_IMAGE_VIEW_TYPE_2D;
+  switch (type) {
+    case Type::DepthBuffer:
+      subrange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+      break;
+    case Type::CubeMap:
+      subrange.levelCount = info.mipLevels;
+      subrange.layerCount = 6;
+      view_type = VK_IMAGE_VIEW_TYPE_CUBE;
+      break;
+    case Type::Standard:
+      break;
+  }
+
+  VkImageViewCreateInfo view_info = {
+      .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+      .image = image,
+      .viewType = view_type,
+      .format = info.format,
+      .components = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G,
+                     VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A},
+      .subresourceRange = subrange,
+  };
+
+  CHECKRE(vkCreateImageView(vk, &view_info, 0, &view));
+
+  type_layout(info.usage, descriptor_type, layout);
+
+  sampler = create_sampler(VK_SAMPLER_ADDRESS_MODE_REPEAT, info.mipLevels);
+
+  return Box<Image>(new Image{
+      .allocation = allocation,
+      .image = image,
+      .view = view,
+      .sampler = sampler,
+      .type = descriptor_type,
+      .layout = layout,
+  });
+}
 
 Box<Image> Image::mk(VkFormat format,
                      VkImageUsageFlags usage,
                      VkExtent2D extent,
                      u32 mip,
-                     VkSampleCountFlagBits ms,
-                     VkImageAspectFlags aspect) {
-
-  VkImage image;
-  VmaAllocation allocation;
-  VkDescriptorType type;
-  VkImageLayout layout;
-  VkImageView view;
-  VkSampler sampler;
+                     Type type,
+                     VkSampleCountFlagBits ms) {
 
   VkImageCreateInfo info = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -99,37 +115,7 @@ Box<Image> Image::mk(VkFormat format,
       .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
   };
 
-  VmaAllocationCreateInfo allocation_info = {.usage =
-                                                 VMA_MEMORY_USAGE_GPU_ONLY};
-  VmaAllocationInfo out_info;
-
-  CHECKRE(vmaCreateImage(vk, &info, &allocation_info, &image, &allocation,
-                         &out_info));
-
-  VkImageViewCreateInfo view_info = {
-      .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-      .image = image,
-      .viewType = VK_IMAGE_VIEW_TYPE_2D,
-      .format = format,
-      .subresourceRange = {
-          .aspectMask = aspect,
-          .levelCount = 1,
-          .layerCount = 1,
-      }};
-  CHECKRE(vkCreateImageView(vk, &view_info, 0, &view));
-
-  type_layout(usage, type, layout);
-
-  sampler = create_sampler(VK_SAMPLER_ADDRESS_MODE_REPEAT, mip);
-
-  return Box<Image>(new Image{
-      .allocation = allocation,
-      .image = image,
-      .view = view,
-      .sampler = sampler,
-      .type = type,
-      .layout = layout,
-  });
+  return Image::mk(info, type);
 }
 
 Image::~Image() {

@@ -1,6 +1,7 @@
 #ifndef A5C13A51_878E_410E_B45F_954C97F8D972
 #define A5C13A51_878E_410E_B45F_954C97F8D972
-#include "texture.h"
+
+#include "image.h"
 
 
 namespace xofo {

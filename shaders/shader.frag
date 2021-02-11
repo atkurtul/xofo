@@ -1,10 +1,10 @@
 #version 450
 
-layout(location = 0) in vec2 tex;
-layout(location = 1) in mat3 norm;
-layout(location = 4) in vec4 pos;
-layout(location = 5) in vec3 fnorm;
-layout(location = 0) out vec4 outColor;
+layout(location = 0) in vec3 frag_pos;
+layout(location = 1) in vec2 tex;
+layout(location = 2) in mat3 norm_mat;
+
+layout(location = 0) out vec4 out_color;
 
 layout(set = 1, binding = 0) uniform sampler2D albedo;
 layout(set = 1, binding = 1) uniform sampler2D normal;
@@ -12,10 +12,26 @@ layout(set = 1, binding = 2) uniform sampler2D metalic;
 
 layout(set = 0, binding = 0) uniform UBO00 {
   vec4 pos;
-  ivec4 nLights;
-  vec4 lights[1024];
+  vec4 light_pos;
+  vec4 light_color;
 }
 cam;
+
+void main1() {
+  vec3 object_color = texture(albedo, tex).rgb;
+  vec3 norm = texture(normal, tex).rgb * 2 - 1;
+  norm = normalize(norm_mat * norm);
+
+  vec3 light_dir = normalize(cam.light_pos.xyz - frag_pos);
+
+  vec3 light_color = cam.light_color.xyz;
+
+  vec3 diffuse = max(dot(norm, light_dir), 0.0) * light_color;
+
+  vec3 ambient = vec3(0.45);
+  vec3 final_color = (ambient + diffuse) * object_color;
+  out_color = vec4(final_color, 1.0);
+}
 
 const float PI = 3.14159265359;
 float DistributionGGX(vec3 N, vec3 H, float roughness);
@@ -30,43 +46,39 @@ vec3 srgb_to_linear(vec3 c) {
 void main() {
   vec3 col = texture(albedo, tex).rgb;
   vec3 metal = texture(metalic, tex).rgb;
-  vec3 N = texture(normal, tex).rgb * 2 - 1;
-  N = normalize(norm * N);
-  // if(cam.nLights.y == 1)
-  // N = normalize(norm * vec3(0, 0, 1));
-  vec3 V = normalize((cam.pos - pos).xyz);
+  vec3 norm = texture(normal, tex).rgb * 2 - 1;
+  norm = normalize(norm_mat * norm);
+
+  vec3 V = normalize(cam.pos.xyz - frag_pos);
 
   vec3 F0 = vec3(0.04);
   F0 = mix(F0, col, metal);
 
   // reflectance equation
-  vec3 Lo = vec3(0.0);
-  for (int i = 0; i < cam.nLights.x; ++i) {
-    // calculate per-light radiance
-    vec3 L = normalize((cam.lights[2 * i] - pos).xyz);
-    vec3 H = normalize(V + L);
-    float distance = length(L);
-    float attenuation = 1.0 / (distance * distance);
-    vec3 radiance = cam.lights[2 * i + 1].xyz * attenuation;
 
-    // cook-torrance brdf
-    float roughness = 0.2;
-    float NDF = DistributionGGX(N, H, roughness);
-    float G = GeometrySmith(N, V, L, roughness);
-    vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
+  vec3 L = normalize(cam.light_pos.xyz - frag_pos);
+  vec3 H = normalize(V + L);
+  float distance = length(L);
+  float attenuation = 1.0 / (distance * distance);
+  vec3 radiance = cam.light_color.xyz * attenuation;
 
-    vec3 kS = F;
-    vec3 kD = vec3(1.0) - kS;
-    kD *= 1.0 - metal;
+  // cook-torrance brdf
+  float roughness = 0.2;
+  float NDF = DistributionGGX(norm, H, roughness);
+  float G = GeometrySmith(norm, V, L, roughness);
+  vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
 
-    vec3 numerator = NDF * G * F;
-    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0);
-    vec3 specular = numerator / max(denominator, 0.001);
+  vec3 kS = F;
+  vec3 kD = vec3(1.0) - kS;
+  kD *= 1.0 - metal;
 
-    // add to outgoing radiance Lo
-    float NdotL = max(dot(N, L), 0.0);
-    Lo += (kD * col / PI + specular) * radiance * NdotL;
-  }
+  vec3 numerator = NDF * G * F;
+  float denominator = 4.0 * max(dot(norm, V), 0.0) * max(dot(norm, L), 0.0);
+  vec3 specular = numerator / max(denominator, 0.001);
+
+  // add to outgoing radiance Lo
+  float NdotL = max(dot(norm, L), 0.0);
+  vec3 Lo = (kD * col / PI + specular) * radiance * NdotL;
 
   vec3 ambient = vec3(0.03) * col;
   vec3 color = ambient + Lo;
@@ -74,8 +86,7 @@ void main() {
   color = color / (color + vec3(1.0));
   color = pow(color, vec3(1.0 / 2.2));
 
-  outColor = vec4(color, 1.0);
-  
+  out_color = vec4(color, 1.0);
 }
 
 float DistributionGGX(vec3 N, vec3 H, float roughness) {

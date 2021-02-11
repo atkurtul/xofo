@@ -1,7 +1,7 @@
 #ifndef E7CD5CCF_D975_419F_81AE_1FAAB38BA0F3
 #define E7CD5CCF_D975_419F_81AE_1FAAB38BA0F3
 
-#include <algorithm>
+
 #include <cstdlib>
 #include <cstring>
 #include <functional>
@@ -12,6 +12,7 @@
 
 #include "typedefs.h"
 #include "vk_mem_alloc.h"
+
 
 template <class T>
 using Box = std::unique_ptr<T>;
@@ -50,12 +51,13 @@ u32 buffer_count();
 void resize(VkExtent2D x);
 bool get_key(char);
 bool mbutton(int lr);
-void hide_mouse();
-void unhide_mouse();
+void hide_mouse(bool state) ;
 
 int poll();
 double dt();
 vec2 mdelta();
+
+VkSampler create_sampler(VkSamplerAddressMode mode, uint mip);
 
 static struct VulkanProxy {
   operator VkInstance();
