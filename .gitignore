@@ -1,6 +1,5 @@
 external/lib
 external/mango
 build
-models
 .cache
 .vscode
