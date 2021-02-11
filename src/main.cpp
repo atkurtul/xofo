@@ -1,15 +1,7 @@
+#include <xofo.h>
 
-#include <buffer.h>
-#include <camera.h>
-#include <imgui.h>
+using namespace std;
 
-#include <mesh_loader.h>
-#include <pipeline.h>
-#include <vk.h>
-#include <vulkan/vulkan_core.h>
-#include <cstring>
-#include <memory>
-#include "typedefs.h"
 
 template <class F>
 void imgui_win(const char* title, F&& f) {
@@ -21,137 +13,122 @@ void imgui_win(const char* title, F&& f) {
 struct Light {
   vec4 pos;
   vec4 color;
+
+  void integrate(vec3& meta, f32 dt) {
+    meta.x += dt * meta.y * 0.1;
+    const float angle = 2 * 3.1415 * meta.x;
+    pos = vec4(cosf(angle) * meta.z, 0, sinf(angle) * meta.z, 1);
+  }
+
+  Light() {
+    color = vec4{mango::clamp(float(rand() % 255) / 255, 0.5f, 1.f),
+                 mango::clamp(float(rand() % 255) / 255, 0.5f, 1.f),
+                 mango::clamp(float(rand() % 255) / 255, 0.5f, 1.f), 1};
+  }
 };
 
 void integrate_lights(f32 dt, vector<Light>& lights, vector<vec3>& meta) {
   u32 i = 0;
   for (auto& light : meta) {
-    light.x += dt * light.y * 0.1;
-    const float angle = 2 * 3.1415 * light.x;
-    lights[i++].pos = vec4(cosf(angle) * light.z, 0, sinf(angle) * light.z, 1);
+    lights.at(i).integrate(light, dt);
   }
 }
 
 void make_lights(u32 n, f32 r, vector<Light>& lights, vector<vec3>& meta) {
+  lights.clear();
   lights.resize(n);
   meta.resize(n);
-
-  for (auto& light : lights) {
-    light.color = vec4{float(rand() % 255) / 255, float(rand() % 255) / 255,
-                    float(rand() % 255) / 255, 1};
-  }
-
-  for (auto& light : meta) {
-    light.x = float(rand() % 255) / 255;
-    light.y = 0.01 + 0.5 * float(rand() % 255) / 255;
-    light.z = r * (float(rand() % 255) / 255.f + 0.01);
+  for (auto& meta : meta) {
+    meta.x = float(rand() % 255) / 255;
+    meta.y = 0.01 + 0.5 * float(rand() % 255) / 255;
+    meta.z = r * (float(rand() % 255) / 255.f + 0.01);
   }
 }
 
 int main() {
-  Box<Pipeline> pipeline(new Pipeline("shaders/shader"));
+  xofo::init();
+  Box<xofo::Pipeline> pipeline(new xofo::Pipeline("shaders/shader"));
 
-  auto uniform = Buffer::mk(65536, Buffer::Uniform, Buffer::Mapped);
+  auto uniform =
+      xofo::Buffer::mk(65536, xofo::Buffer::Uniform, xofo::Buffer::Mapped);
 
-  Box<Buffer> buffer;
-  // Texture texture("models/car/posx.jpg", VK_FORMAT_R8G8B8A8_SRGB);
-  // auto texture = Texture::mk("blue.png", VK_FORMAT_R8G8B8A8_SRGB);
+  xofo::Model model0("models/sponza/sponza.gltf", *pipeline);
+  xofo::Model model1("models/doom/0.obj", *pipeline);
+  xofo::Model model2("models/batman/0.obj", *pipeline);
+  xofo::Model model3("models/heavy_assault_rifle/scene.gltf", *pipeline);
 
-  vector<Mesh> meshes;
-  vector<Material> mats;
-  vector<VkDescriptorSet> sets;
-
-  {
-    // MeshLoader mesh_loader("teapot.obj", 56);
-    // MeshLoader mesh_loader("models/scene_Scene.fbx", 56);
-    MeshLoader mesh_loader("models/lightning/0.obj", 56);
-    // MeshLoader mesh_loader("models/doom/0.obj", 56);
-    // MeshLoader mesh_loader("models/car/car.obj", 56);
-    mesh_loader.tex = 12;
-    mesh_loader.norm0 = 20;
-    mesh_loader.norm1 = 32;
-    mesh_loader.norm2 = 44;
-    meshes = mesh_loader.import();
-
-    buffer = Buffer::mk(mesh_loader.size,
-                        Buffer::Vertex | Buffer::Index | Buffer::Dst,
-                        Buffer::Unmapped);
-
-    auto staging = Buffer::mk(mesh_loader.size, Buffer::Src, Buffer::Mapped);
-    mats = mesh_loader.load(staging->mapping);
-    sets.reserve(mats.size());
-    for (auto& mat : mats) {
-      auto set = pipeline->alloc_set(1);
-      mat.diffuse.value()->bind_to_set(set, 0);
-      mat.normal.value()->bind_to_set(set, 1);
-      mat.metallic.value()->bind_to_set(set, 2);
-      sets.push_back(set);
-    }
-
-    vk.execute([&](auto cmd) {
-      VkBufferCopy reg = {0, 0, mesh_loader.size};
-      vkCmdCopyBuffer(cmd, *staging, *buffer, 1, &reg);
-    });
-  }
-
-  u32 prev, curr = vk.res.frames.size() - 1;
+  model0.scale = 0.01;
+  u32 prev, curr = xofo::buffer_count() - 1;
 
   auto cam_set = uniform->bind_to_set(pipeline->alloc_set(0), 0);
 
-  Camera cam(1600, 900);
+  xofo::Camera cam(1600, 900);
 
-  vk.register_callback([&]() {
-    cam.set_prj(vk.res.extent.width, vk.res.extent.height);
+  xofo::register_recreation_callback([&](auto extent) {
+    cam.set_prj(extent.width, extent.height);
     pipeline->reset();
   });
 
-  vector<Light> lights(32);
-  vector<vec3> meta(32);
-  u32 n_lights = 32;
+  vector<Light> lights;
+  vector<vec3> meta;
+  u32 n_lights = 16;
   f32 radius = 8;
   make_lights(n_lights, radius, lights, meta);
 
-  while (vk.win.poll()) {
-    float dt = vk.win.dt;
+  mat m3(0.1);
+  vec4 ax(0, 0, 0, 1);
+  vec3 xxf(0);
+
+  string read_to_string(const char* file);
+
+  while (xofo::poll()) {
+    double dt = xofo::dt();
+
     integrate_lights(dt, lights, meta);
 
-    auto mdelta = vk.win.mdelta * -0.0015f;
-    if (!vk.win.mbutton(1)) {
+    auto mdelta = xofo::mdelta() * -0.0012f;
+    if (!xofo::mbutton(1)) {
       mdelta = {};
-      vk.win.unhide_mouse();
+      xofo::unhide_mouse();
     } else {
-      vk.win.hide_mouse();
+      xofo::hide_mouse();
     }
-    f32 w = vk.win.get_key('W');
-    f32 a = vk.win.get_key('A');
-    f32 s = vk.win.get_key('S');
-    f32 d = vk.win.get_key('D');
+    f32 w = xofo::get_key('W');
+    f32 a = xofo::get_key('A');
+    f32 s = xofo::get_key('S');
+    f32 d = xofo::get_key('D');
+    cam.update(mdelta, s - w, d - a, dt * 5);
 
-    uniform->copy(cam.update(mdelta, s - w, d - a, dt));
-    uniform->copy(cam.pos, 64);
-    uniform->copy(vec4i(lights.size()), 64 + 16);
-    uniform->copy(lights.size() * sizeof(vec4[2]), lights.data(), 64 + 32);
+    uniform->copy(cam.pos);
+    uniform->copy(vec4i(lights.size()), 16);
+    uniform->copy(lights.size() * sizeof(vec4[2]), lights.data(), 32);
 
-    vk.draw(
+    if (xofo::get_key('E') | 1) {
+      auto xf = mat(1);
+      xf.translate(xxf + vec3(0.1, -0.2, -0.4));
+      auto xx = mango::AngleAxis(-180 * RADIAN, vec3(0, 1, 1)) *
+                mango::AngleAxis(ax.w, ax.xyz);
+      m3 = mat(0.015) * xx * xf * mango::inverse(cam.view);
+    }
+
+    xofo::draw(
         [&](auto cmd) {
           vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline);
-          auto id = mat(1);
-          vkCmdPushConstants(cmd, *pipeline, 17, 0, 64, &id);
           vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                   *pipeline, 0, 1, &cam_set, 0, 0);
 
-          for (auto& mesh : meshes) {
-            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    *pipeline, 1, 1, &sets.at(mesh.mat), 0, 0);
-            vkCmdBindVertexBuffers(cmd, 0, 1, &buffer->buffer,
-                                   &mesh.vertex_offset);
-            vkCmdBindIndexBuffer(cmd, *buffer, mesh.index_offset,
-                                 VK_INDEX_TYPE_UINT32);
-            vkCmdDrawIndexed(cmd, mesh.indices / 4, 1, 0, 0, 0);
-          }
+          vkCmdPushConstants(cmd, *pipeline, 17, 0, 64, &cam.view);
+          vkCmdPushConstants(cmd, *pipeline, 17, 64, 64, &cam.prj);
+          model0.draw(cmd, *pipeline, mat(0.01));
+          model1.draw(cmd, *pipeline, mat(1));
+          auto id = mat(1);
+          id.translate(-vec3(1, 0, 1));
+          model2.draw(cmd, *pipeline, id);
+          model3.draw(cmd, *pipeline, m3);
         },
         [&]() {
           imgui_win("Pipeline state", [&]() {
+            ImGui::Text("%5f", 1.f / dt);
             if (ImGui::RadioButton("Polygon Fill",
                                    pipeline->mode == VK_POLYGON_MODE_FILL))
               pipeline->set_mode(VK_POLYGON_MODE_FILL);
@@ -166,20 +143,23 @@ int main() {
               pipeline->reset();
             if (ImGui::Checkbox("Depth Write", &pipeline->depth_write))
               pipeline->reset();
-            auto extent = vk.res.extent;
+            auto extent = xofo::extent();
             if (ImGui::SliderInt("Width", (i32*)&extent.width, 400, 1920) ||
                 ImGui::SliderInt("Height", (i32*)&extent.height, 400, 1080)) {
-              vk.win.resize(extent);
+              xofo::resize(extent);
             }
+            if (ImGui::Button("Reload shaders")) {
+              pipeline->recompile();
+            }
+            ImGui::DragFloat4("Angle Axis  0", (float*)&ax, 0.005, -10, 10);
+            ImGui::DragFloat3("Offset", (float*)&xxf, 0.05, -2, 2);
 
-            if (
-              ImGui::SliderInt("Number of lights", (i32*)&n_lights, 0, 64) ||
-              ImGui::SliderFloat("Average radius", &radius, 4, 1024) 
-            ) {
+            if (ImGui::SliderInt("Number of lights", (i32*)&n_lights, 0, 64) ||
+                ImGui::SliderFloat("Average radius", &radius, 4, 1024)) {
               make_lights(n_lights, radius, lights, meta);
             }
           });
         });
   }
-  CHECKRE(vkDeviceWaitIdle(vk));
+  CHECKRE(vkDeviceWaitIdle(xofo::vk));
 }

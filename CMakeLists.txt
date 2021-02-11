@@ -19,13 +19,11 @@ add_dependencies(vk mango_download)
 
 target_include_directories(vk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-# target_include_directories(vk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/external/vma)
 target_include_directories(vk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/external/include)
 target_link_directories(vk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/external/lib)
 
 
 target_link_libraries(vk mango)
-target_link_libraries(vk vma)
 target_link_libraries(vk imgui)
 target_link_libraries(vk vulkan)
 target_link_libraries(vk shaderc_shared)

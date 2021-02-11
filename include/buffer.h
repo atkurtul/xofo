@@ -1,10 +1,8 @@
 #ifndef D8F23374_2F16_4692_A5AE_7D3369B8E620
 #define D8F23374_2F16_4692_A5AE_7D3369B8E620
-#include <vk_mem_alloc.h>
-#include <util.h>
-#include <cstring>
+#include "core.h"
 
-
+namespace xofo {
 struct Buffer {
   enum {
     Src = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -25,20 +23,39 @@ struct Buffer {
 
   operator VkBuffer() const { return buffer; }
 
-  void copy(size_t len, void* pp, size_t offset = 0) { memcpy(mapping + offset, pp, len); }
+  void copy(size_t len, void* pp, size_t offset = 0) {
+    memcpy(mapping + offset, pp, len);
+  }
 
   template <class T>
   void copy(T const& obj, size_t offset = 0) {
     memcpy(mapping + offset, &obj, sizeof(T));
   }
 
-  ~Buffer();
+  ~Buffer() { vmaDestroyBuffer(vk, buffer, allocation); }
 
   static Box<Buffer> mk(size_t size, VkBufferUsageFlags usage, Mapping);
 
+  VkDescriptorSet bind_to_set(VkDescriptorSet set, u32 bind) {
+    VkDescriptorBufferInfo info = {
+        .buffer = buffer,
+        .offset = 0,
+        .range = VK_WHOLE_SIZE,
+    };
 
-  VkDescriptorSet bind_to_set(VkDescriptorSet set, u32 bind);
+    VkWriteDescriptorSet write = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .dstSet = set,
+        .dstBinding = bind,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .pBufferInfo = &info};
 
+    vkUpdateDescriptorSets(vk, 1, &write, 0, 0);
+    return set;
+  }
 };
+
+}  // namespace xofo
 
 #endif /* D8F23374_2F16_4692_A5AE_7D3369B8E620 */

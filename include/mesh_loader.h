@@ -1,8 +1,7 @@
 #ifndef C38E0870_5656_4905_97E9_318751A4B327
 #define C38E0870_5656_4905_97E9_318751A4B327
-#include <memory>
-#include <typedefs.h>
-#include <mesh.h>
+
+#include "mesh.h"
 
 namespace Assimp {
   class Importer;
@@ -17,9 +16,9 @@ struct MeshLoader {
   u32 size;
 
   MeshLoader(const char* file, u32 stride);
-  std::vector<Mesh>  import();
+  std::vector<xofo::Mesh>  import();
 
-  std::vector<Material> load(char* buffer);
+  std::vector<xofo::Material> load(char* buffer);
   ~MeshLoader();
 };
 

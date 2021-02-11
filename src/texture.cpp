@@ -1,9 +1,5 @@
-#include "texture.h"
-#include <image.h>
-#include <math.h>
-#include <vk.h>
-#include <cstdio>
-#include <cstdlib>
+#include <xofo.h>
+
 #include <mango/image/surface.hpp>
 
 void copy_texture(VkCommandBuffer cmd,
@@ -152,6 +148,7 @@ void generate_mips(VkCommandBuffer cmd,
                        &barr);
 }
 
+namespace xofo {
 
 Box<Texture> Texture::mk(void* data, VkFormat format, u32 width, u32 height) {
   u64 size = width * height * 4;
@@ -169,7 +166,7 @@ Box<Texture> Texture::mk(void* data, VkFormat format, u32 width, u32 height) {
   auto src = Buffer::mk(size, Buffer::Src, Buffer::Mapped);
   memcpy(src->mapping, data, size);
 
-  vk.execute([&](auto cmd) {
+  xofo::execute([&](auto cmd) {
     copy_texture(cmd, *src, *image, extent);
     generate_mips(cmd, mip, *image, extent);
   });
@@ -185,3 +182,5 @@ Box<Texture> Texture::mk(std::string file, VkFormat format) {
 
   return Texture::mk(bitmap.image, format, bitmap.width, bitmap.height);
 }
+
+}  // namespace xofo

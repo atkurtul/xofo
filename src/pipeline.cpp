@@ -1,22 +1,27 @@
-#include <pipeline.h>
-#include <vk.h>
 #include <vulkan/vulkan_core.h>
+#include <xofo.h>
+
 #include <fstream>
-#include <shaderc/shaderc.hpp>
-#include <spirv_cross/spirv_cross.hpp>
 #include <unordered_map>
 
-using namespace std;
+#include <shaderc/shaderc.hpp>
+#include <spirv_cross/spirv_cross.hpp>
 
-string read_to_string(const char* file) {
+using namespace std;
+using namespace xofo;
+
+static string read_to_string(const char* file) {
   ifstream t(file);
   return string(istreambuf_iterator<char>(t), istreambuf_iterator<char>());
 }
 
-vector<u32> compile_glsl(const char* file, shaderc_shader_kind stage) {
+static vector<u32> compile_glsl(const char* file, shaderc_shader_kind stage) {
   auto src = read_to_string(file);
   shaderc::Compiler comp;
-  auto re = comp.CompileGlslToSpv(src.c_str(), src.size(), stage, file);
+  shaderc::CompileOptions opt;
+  opt.SetOptimizationLevel(shaderc_optimization_level_performance);
+
+  auto re = comp.CompileGlslToSpv(src.c_str(), src.size(), stage, file, opt);
   if (re.GetCompilationStatus()) {
     cerr << re.GetErrorMessage() << "\n";
     abort();
@@ -24,7 +29,7 @@ vector<u32> compile_glsl(const char* file, shaderc_shader_kind stage) {
   return vector<u32>(re.begin(), re.end());
 }
 
-VkFormat type_format(int basetype, int vecsize) {
+static VkFormat type_format(int basetype, int vecsize) {
   switch (basetype) {
     case spirv_cross::SPIRType::Int:
       switch (vecsize) {
@@ -66,9 +71,9 @@ VkFormat type_format(int basetype, int vecsize) {
   throw;
 }
 
-vector<u32> compile_shader(string const& file,
-                           shaderc_shader_kind stage,
-                           VkShaderModule& module) {
+static vector<u32> compile_shader(string const& file,
+                                  shaderc_shader_kind stage,
+                                  VkShaderModule& module) {
   auto bin = compile_glsl(file.c_str(), stage);
 
   VkShaderModuleCreateInfo module_info = {
@@ -83,11 +88,12 @@ vector<u32> compile_shader(string const& file,
 
 namespace sc = spirv_cross;
 
-void build_set_layouts(sc::Compiler& cc,
-                       sc::SmallVector<sc::Resource> const& res,
-                       VkDescriptorType ty,
-                       VkShaderStageFlags stage,
-                       vector<vector<VkDescriptorSetLayoutBinding>>& bindings) {
+static void build_set_layouts(
+    sc::Compiler& cc,
+    sc::SmallVector<sc::Resource> const& res,
+    VkDescriptorType ty,
+    VkShaderStageFlags stage,
+    vector<vector<VkDescriptorSetLayoutBinding>>& bindings) {
   for (auto& res : res) {
     auto set =
         cc.get_decoration(res.id, spv::Decoration::DecorationDescriptorSet);
@@ -98,6 +104,8 @@ void build_set_layouts(sc::Compiler& cc,
     if (bindings[set].size() < bind + 1) {
       bindings[set].resize(bind + 1);
     }
+    cout << set << ":" << bind << "\n";
+    cout << "\t" << desc_type_string(ty) << "\n";
     auto& desc = bindings[set][bind];
     if (desc.descriptorCount != 0) {
       if (desc.descriptorType != ty) {
@@ -116,7 +124,7 @@ struct ShaderData {
   u32 stride;
 };
 
-ShaderData extract_input_state_and_uniforms(
+static ShaderData extract_input_state_and_uniforms(
     vector<u32> const& bytecode,
     VkShaderStageFlags stage,
     vector<vector<VkDescriptorSetLayoutBinding>>& bindings) {
@@ -169,10 +177,10 @@ Pipeline::Pipeline(string const& shader) : shader(shader) {
 
   vector<vector<VkDescriptorSetLayoutBinding>> bindings;
 
-  auto [attr, stride] = extract_input_state_and_uniforms(
+  auto shader_data = extract_input_state_and_uniforms(
       bin0, VK_SHADER_STAGE_VERTEX_BIT, bindings);
-  this->attr = move(attr);
-  this->stride = stride;
+  this->attr = move(shader_data.attr);
+  this->stride = shader_data.stride;
   extract_input_state_and_uniforms(bin1, VK_SHADER_STAGE_FRAGMENT_BIT,
                                    bindings);
 
@@ -184,8 +192,8 @@ Pipeline::Pipeline(string const& shader) : shader(shader) {
     for (auto& bind : bindings) {
       sizes[bind.descriptorType] += bind.descriptorCount * 4096;
     }
-    for (auto [k, v] : sizes) {
-      pools.push_back({k, v});
+    for (auto kv : sizes) {
+      pools.push_back({kv.first, kv.second});
     }
     VkDescriptorPoolCreateInfo pinfo = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
@@ -272,13 +280,13 @@ void Pipeline::create() {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
       .topology = topology,
   };
-
+  auto extent = xofo::extent();
   VkViewport Viewports = {
-      .width = (f32)vk.res.extent.width,
-      .height = (f32)vk.res.extent.height,
+      .width = (f32)extent.width,
+      .height = (f32)extent.height,
       .maxDepth = 1.f,
   };
-  VkRect2D Scissors = {.extent = vk.res.extent};
+  VkRect2D Scissors = {.extent = extent};
   VkPipelineViewportStateCreateInfo ViewportState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
       .viewportCount = 1,
@@ -320,6 +328,7 @@ void Pipeline::create() {
   VkPipelineRasterizationStateCreateInfo RasterizationState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
       .polygonMode = mode,
+      .cullMode = VK_CULL_MODE_BACK_BIT,
       .lineWidth = 1.f};
 
   VkGraphicsPipelineCreateInfo info = {
@@ -335,7 +344,7 @@ void Pipeline::create() {
       .pColorBlendState = &ColorBlendState,
       .pDynamicState = &DynamicState,
       .layout = layout,
-      .renderPass = vk.res.renderpass,
+      .renderPass = xofo::renderpass(),
   };
   CHECKRE(vkCreateGraphicsPipelines(vk, 0, 1, &info, 0, &pipeline));
 }

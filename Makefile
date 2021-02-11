@@ -9,4 +9,4 @@ all:
 	@cd build && ninja
 
 clean:
-	rm -rf build 
+	@rm -rf build .cache

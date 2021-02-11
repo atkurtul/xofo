@@ -1,10 +1,16 @@
 #include "image.h"
-#include <vk.h>
+#include <xofo.h>
 #include <vulkan/vulkan_core.h>
 #include <memory>
 
 #include <unordered_map>
-unordered_map<u64, VkSampler> samplers;
+
+
+using namespace std;
+using namespace xofo;
+
+static unordered_map<u64, VkSampler> samplers;
+
 
 void destroy_samplers() {
   for (auto [k, v] : samplers) {

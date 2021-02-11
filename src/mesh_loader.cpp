@@ -1,12 +1,16 @@
+#include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 #include <assimp/types.h>
+
 #include <mesh_loader.h>
-#include <assimp/Importer.hpp>
+
+
 #include <iostream>
 #include <unordered_map>
-#include "texture.h"
+
 using namespace std;
+using namespace xofo;
 
 MeshLoader::MeshLoader(const char* file, u32 stride)
     : file(file),
@@ -27,6 +31,7 @@ std::vector<Mesh> MeshLoader::import() {
                                        aiProcess_GenSmoothNormals |
                                        aiProcess_CalcTangentSpace |
                                        aiProcess_LimitBoneWeights);
+                                       if(!scene) abort();
   size = 0;
   std::vector<Mesh> meshes;
   for (u32 i = 0; i < scene->mNumMeshes; ++i) {
@@ -55,14 +60,7 @@ std::vector<Material> MeshLoader::load(char* buffer) {
   string base = file;
 
   base.erase(base.begin() + base.find_last_of("/") + 1, base.end());
-  u8 bb[4] = { 0,0,0,255};
 
-
-  Rc<Texture> black(Texture::mk(bb, VK_FORMAT_R8G8B8A8_SRGB, 1, 1));
-  bb[2] = 255;
-  Rc<Texture> blue(Texture::mk(bb, VK_FORMAT_R8G8B8A8_SRGB, 1, 1));
-  bb[0] = bb[1] = 255;
-  Rc<Texture> white(Texture::mk(bb, VK_FORMAT_R8G8B8A8_SRGB, 1, 1));
 
   for (u32 i = 0; i < scene->mNumMaterials; ++i) {
     Material mmat;
@@ -73,9 +71,6 @@ std::vector<Material> MeshLoader::load(char* buffer) {
     if (aiReturn_SUCCESS == mat->Get(AI_MATKEY_COLOR_DIFFUSE, color)) {
       mmat.color = vec3{color.r, color.g, color.b};
     }
-    mmat.diffuse = white;
-    mmat.normal = blue;
-    mmat.metallic = black;
 
     if (aiReturn_SUCCESS == mat->GetTexture(aiTextureType_DIFFUSE, 0, &path)) {
       string rpath = base + path.C_Str();

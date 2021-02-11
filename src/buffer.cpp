@@ -1,5 +1,7 @@
-#include <vk.h>
+#include <xofo.h>
 #include <memory>
+
+using namespace xofo;
 
 Box<Buffer> Buffer::mk(size_t size, VkBufferUsageFlags usage, Mapping map) {
   VkBufferCreateInfo buffer_info = {
@@ -35,25 +37,3 @@ Box<Buffer> Buffer::mk(size_t size, VkBufferUsageFlags usage, Mapping map) {
   });
 }
 
-Buffer::~Buffer() {
-  vmaDestroyBuffer(vk, buffer, allocation);
-}
-
-VkDescriptorSet Buffer::bind_to_set(VkDescriptorSet set, u32 bind) {
-  VkDescriptorBufferInfo info = {
-      .buffer = buffer,
-      .offset = 0,
-      .range = VK_WHOLE_SIZE,
-  };
-
-  VkWriteDescriptorSet write = {
-      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-      .dstSet = set,
-      .dstBinding = bind,
-      .descriptorCount = 1,
-      .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-      .pBufferInfo = &info};
-
-  vkUpdateDescriptorSets(vk, 1, &write, 0, 0);
-  return set;
-}

@@ -1,22 +1,22 @@
-#include <util.h>
-#include <vulkan/vulkan_core.h>
-#include <string>
-#include <vector>
-using namespace std;
+#ifndef B6EB7CB5_9227_4FBF_9721_005CAC0511AA
+#define B6EB7CB5_9227_4FBF_9721_005CAC0511AA
+#include "core.h"
+
+namespace xofo {
 
 struct Shader {
-  vector<u32> bytecode;
+  std::vector<u32> bytecode;
   VkShaderModule module;
 };
 
 struct Pipeline {
-  string shader;
+  std::string shader;
   VkPipelineLayout layout;
   VkPipeline pipeline;
-  vector<VkDescriptorSetLayout> set_layouts;
-  vector<VkDescriptorPool> pools;
+  std::vector<VkDescriptorSetLayout> set_layouts;
+  std::vector<VkDescriptorPool> pools;
 
-  vector<VkVertexInputAttributeDescription> attr;
+  std::vector<VkVertexInputAttributeDescription> attr;
   u32 stride;
   VkShaderModule modules[2];
   operator VkPipeline() { return pipeline; }
@@ -31,6 +31,7 @@ struct Pipeline {
   bool depth_write = true;
 
   void reset();
+  void recompile() {}
 
   void set_mode(VkPolygonMode mode) {
     this->mode = mode;
@@ -57,3 +58,6 @@ struct Pipeline {
   VkDescriptorSet alloc_set(u32 set);
   ~Pipeline();
 };
+
+}  // namespace xofo
+#endif /* B6EB7CB5_9227_4FBF_9721_005CAC0511AA */

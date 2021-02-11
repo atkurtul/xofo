@@ -14,12 +14,12 @@ ExternalProject_Add(mango_download
 )
 
 
-add_library(vma ${CMAKE_CURRENT_SOURCE_DIR}/vma/vma.cpp)
-target_include_directories(vma PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vma)
+# add_library(vma ${CMAKE_CURRENT_SOURCE_DIR}/vma/vma.cpp)
+# target_include_directories(vma PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vma)
 
-set_target_properties(vma
-  PROPERTIES
-  ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/lib"
-  LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/lib"
-  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin"
-)
+# set_target_properties(vma
+#   PROPERTIES
+#   ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/lib"
+#   LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/lib"
+#   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin"
+# )

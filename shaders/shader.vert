@@ -13,22 +13,19 @@ layout(location = 4) out vec4 fragpos;
 layout(location = 5) out vec3 fnorm;
 
 
-layout(set=0, binding=0) uniform UBO00 {
-    mat4 prj;
+layout(push_constant) uniform push_block {
+  mat4 view;
+  mat4 prj;
+  mat4 xf;
 } cam;
 
-layout(push_constant) uniform push_block {
-    mat4 xf;
-} xf;
-
-void main() 
-{
-    fragpos = xf.xf * vec4(pos, 1);
-    gl_Position = cam.prj * fragpos;
-    outtex = tex;
-    vec3 T = normalize(xf.xf * vec4(tangent, 0.0)).xyz;
-    vec3 B = normalize(xf.xf * vec4(bitangent, 0.0)).xyz;
-    vec3 N = normalize(xf.xf * vec4(norm, 0.0)).xyz;
-    outnorm = mat3(T, B, N);
-    fnorm = (xf.xf * vec4(norm, 1)).xyz;
+void main() {
+  fragpos = cam.xf * vec4(pos, 1);
+  gl_Position = cam.prj * cam.view * fragpos;
+  outtex = tex;
+  vec3 T = normalize(cam.xf * vec4(tangent, 0.0)).xyz;
+  vec3 B = normalize(cam.xf * vec4(bitangent, 0.0)).xyz;
+  vec3 N = normalize(cam.xf * vec4(norm, 0.0)).xyz;
+  outnorm = mat3(T, B, N);
+  fnorm = (cam.xf * vec4(norm, 1)).xyz;
 }
