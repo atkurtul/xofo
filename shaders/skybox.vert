@@ -11,5 +11,5 @@ cam;
 
 void main() {
   out_tex = in_pos;
-  gl_Position = cam.prj * cam.view * vec4(in_pos, 1.0);
+  gl_Position = cam.prj * cam.view * cam.xf * vec4(in_pos, 1.0);
 }

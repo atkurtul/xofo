@@ -339,6 +339,11 @@ Box<Texture> xofo::load_cubemap(string file, VkFormat format) {
   u64 size = ktxTexture_GetSize(tex);
   u8* data = ktxTexture_GetData(tex);
 
+  cout << "Width: " << width << "\n";
+  cout << "Height: " << height << "\n";
+  cout << "Mip: " << mip << "\n";
+  cout << "Size: " << size << "\n";
+
   auto staging = Buffer::mk(size, Buffer::Src, Buffer::Mapped);
   memcpy(staging->mapping, data, size);
 

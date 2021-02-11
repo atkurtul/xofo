@@ -1,4 +1,5 @@
 
+#include <vulkan/vulkan_core.h>
 #include <xofo.h>
 
 using namespace std;
@@ -57,13 +58,13 @@ struct CubeMap {
     MeshLoader mesh_loader("models/cube.gltf", pipeline.stride);
     mesh_loader.tex = 12;
 
-    auto meshes = mesh_loader.import();
+    auto meshes = mesh_loader.import(0x1000000);
     if (meshes.size() != 1)
       abort();
 
     mesh = meshes[0];
-    
-    auto buffer = Buffer::mk(mesh_loader.size,
+
+    buffer = Buffer::mk(mesh_loader.size,
                              Buffer::Vertex | Buffer::Index | Buffer::Dst,
                              Buffer::Unmapped);
 
@@ -75,17 +76,33 @@ struct CubeMap {
       vkCmdCopyBuffer(cmd, *staging, *buffer, 1, &reg);
     });
 
-    auto texture = load_cubemap("models/cubemap_yokohama_rgba.ktx",
+    texture = load_cubemap("models/cubemap_yokohama_rgba.ktx",
                                 VK_FORMAT_R8G8B8A8_SRGB);
     set = pipeline.alloc_set(0);
     texture->bind_to_set(set, 0);
   };
+
+  void draw(VkCommandBuffer cmd, VkPipelineLayout layout, mat mat) {
+
+
+    vkCmdPushConstants(cmd, layout, 17, 128, 64, &mat);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 1,
+                            &set, 0, 0);
+                    
+    vkCmdBindVertexBuffers(cmd, 0, 1, &buffer->buffer, &mesh.vertex_offset);
+    vkCmdBindIndexBuffer(cmd, *buffer, mesh.index_offset, VK_INDEX_TYPE_UINT32);
+    
+    vkCmdDrawIndexed(cmd, mesh.indices / 4, 1, 0, 0, 0);
+  }
 };
 
 int main() {
   xofo::init();
   Box<xofo::Pipeline> pipeline(new xofo::Pipeline("shaders/shader"));
   Box<xofo::Pipeline> skybox(new xofo::Pipeline("shaders/skybox"));
+  // skybox->depth_write = 0;
+  // skybox->depth_test = 0;
+  // skybox->reset();
   CubeMap cube_map(*skybox);
   auto uniform =
       xofo::Buffer::mk(65536, xofo::Buffer::Uniform, xofo::Buffer::Mapped);
@@ -136,13 +153,13 @@ int main() {
 
     uniform->copy(cam.pos);
     uniform->copy(light, 16);
-
+    auto inv_view = mango::inverse(cam.view);
     if (xofo::get_key('E') | 1) {
       auto xf = mat(1);
       xf.translate(xxf + vec3(0.1, -0.2, -0.4));
       auto xx = mango::AngleAxis(-180 * RADIAN, vec3(0, 1, 1)) *
                 mango::AngleAxis(ax.w, ax.xyz);
-      m3 = mat(0.015) * xx * xf * mango::inverse(cam.view);
+      m3 = mat(0.015) * xx * xf * inv_view;
     }
 
     xofo::draw(
@@ -154,16 +171,15 @@ int main() {
           vkCmdPushConstants(cmd, *pipeline, 17, 0, 64, &cam.view);
           vkCmdPushConstants(cmd, *pipeline, 17, 64, 64, &cam.prj);
 
-          model0.draw(cmd, *pipeline, mat(0.01));
+          //model0.draw(cmd, *pipeline, mat(0.01));
           model1.draw(cmd, *pipeline, mat(1));
-          auto id = mat(1);
-          id.translate(-vec3(1, 0, 1));
-          model2.draw(cmd, *pipeline, id);
+          model2.draw(cmd, *pipeline, mat(1));
           model3.draw(cmd, *pipeline, m3);
 
           vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *skybox);
-          vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *skybox,
-                                  0, 1, &cube_map.set, 0, 0);
+          auto id = mat(10000);
+          id.translate(cam.pos.xyz);
+          cube_map.draw(cmd, *skybox, id);
         },
         [&]() {
           imgui_win("Pipeline state", [&]() {

@@ -25,11 +25,11 @@ MeshLoader::~MeshLoader() {
   delete importer;
 }
 
-std::vector<Mesh> MeshLoader::import() {
+std::vector<Mesh> MeshLoader::import(u32 flags) {
   scene = importer->ReadFile(file, aiProcess_Triangulate | aiProcess_FlipUVs |
                                        aiProcess_GenSmoothNormals |
                                        aiProcess_CalcTangentSpace |
-                                       aiProcess_LimitBoneWeights);
+                                       aiProcess_LimitBoneWeights | flags);
   if (!scene)
     abort();
   size = 0;

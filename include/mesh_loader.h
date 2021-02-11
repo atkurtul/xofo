@@ -16,7 +16,7 @@ struct MeshLoader {
   u32 size;
 
   MeshLoader(const char* file, u32 stride);
-  std::vector<xofo::Mesh>  import();
+  std::vector<xofo::Mesh>  import(u32 flags = 0);
 
   std::vector<xofo::Material> load_materials();
 
