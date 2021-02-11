@@ -15,6 +15,7 @@ add_executable(vk ${headers} ${src})
 set(CMAKE_BUILD_TYPE DEBUG)
 #set(CMAKE_BUILD_TYPE RELEASE)
 
+
 add_dependencies(vk mango_download)
 
 target_include_directories(vk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
