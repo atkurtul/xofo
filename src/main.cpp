@@ -1,6 +1,7 @@
 
 #include <vulkan/vulkan_core.h>
 #include <xofo.h>
+#include <mango/image/surface.hpp>
 
 using namespace std;
 
@@ -57,7 +58,6 @@ struct CubeMap {
   CubeMap(Pipeline& pipeline) {
     MeshLoader mesh_loader("models/cube.gltf", pipeline.stride);
     mesh_loader.tex = 12;
-
     auto meshes = mesh_loader.import(0x1000000);
     if (meshes.size() != 1)
       abort();
@@ -65,8 +65,8 @@ struct CubeMap {
     mesh = meshes[0];
 
     buffer = Buffer::mk(mesh_loader.size,
-                             Buffer::Vertex | Buffer::Index | Buffer::Dst,
-                             Buffer::Unmapped);
+                        Buffer::Vertex | Buffer::Index | Buffer::Dst,
+                        Buffer::Unmapped);
 
     auto staging = Buffer::mk(mesh_loader.size, Buffer::Src, Buffer::Mapped);
     mesh_loader.load_geometry(staging->mapping);
@@ -76,33 +76,44 @@ struct CubeMap {
       vkCmdCopyBuffer(cmd, *staging, *buffer, 1, &reg);
     });
 
-    texture = load_cubemap("models/cubemap_yokohama_rgba.ktx",
-                                VK_FORMAT_R8G8B8A8_SRGB);
     set = pipeline.alloc_set(0);
+    texture = load_cubemap2("models/car", VK_FORMAT_R8G8B8A8_SRGB);
     texture->bind_to_set(set, 0);
   };
 
   void draw(VkCommandBuffer cmd, VkPipelineLayout layout, mat mat) {
-
-
     vkCmdPushConstants(cmd, layout, 17, 128, 64, &mat);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 1,
                             &set, 0, 0);
-                    
+
     vkCmdBindVertexBuffers(cmd, 0, 1, &buffer->buffer, &mesh.vertex_offset);
     vkCmdBindIndexBuffer(cmd, *buffer, mesh.index_offset, VK_INDEX_TYPE_UINT32);
-    
+
     vkCmdDrawIndexed(cmd, mesh.indices / 4, 1, 0, 0, 0);
+  }
+};
+
+struct Dummy {
+  Box<Buffer> buffer;
+  Mesh mesh;
+
+  Dummy(Pipeline& pipeline) {
+    MeshLoader mesh_loader("models/cube.gltf", pipeline.stride);
+    mesh_loader.tex = 12;
+    mesh_loader.norm0 = 20;
+    mesh_loader.norm1 = 32;
+    mesh_loader.norm2 = 44;
+
   }
 };
 
 int main() {
   xofo::init();
-  Box<xofo::Pipeline> pipeline(new xofo::Pipeline("shaders/shader"));
-  Box<xofo::Pipeline> skybox(new xofo::Pipeline("shaders/skybox"));
-  // skybox->depth_write = 0;
-  // skybox->depth_test = 0;
-  // skybox->reset();
+  auto pipeline = Pipeline::mk("shaders/shader");
+  auto skybox = Pipeline::mk("shaders/skybox");
+  skybox->depth_write = 0;
+  //  skybox->depth_test = 0;
+  skybox->reset();
   CubeMap cube_map(*skybox);
   auto uniform =
       xofo::Buffer::mk(65536, xofo::Buffer::Uniform, xofo::Buffer::Mapped);
@@ -111,9 +122,7 @@ int main() {
   xofo::Model model1("models/doom/0.obj", *pipeline);
   xofo::Model model2("models/batman/0.obj", *pipeline);
   xofo::Model model3("models/heavy_assault_rifle/scene.gltf", *pipeline);
-  model0.scale = 0.01;
-
-  u32 prev, curr = xofo::buffer_count() - 1;
+  model0.scale = 0.1;
 
   auto cam_set = uniform->bind_to_set(pipeline->alloc_set(0), 0);
 
@@ -122,6 +131,7 @@ int main() {
   xofo::register_recreation_callback([&](auto extent) {
     cam.set_prj(extent.width, extent.height);
     pipeline->reset();
+    skybox->reset();
   });
 
   mat m3(0.1);
@@ -130,7 +140,6 @@ int main() {
 
   Light light;
   vec3 meta = vec3{0.f, 1.f, 16.f};
-  string read_to_string(const char* file);
 
   while (xofo::poll()) {
     double dt = xofo::dt();
@@ -164,6 +173,13 @@ int main() {
 
     xofo::draw(
         [&](auto cmd) {
+          vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *skybox);
+          vkCmdPushConstants(cmd, *pipeline, 17, 0, 64, &cam.view);
+          vkCmdPushConstants(cmd, *pipeline, 17, 64, 64, &cam.prj);
+          auto id = mat(1);
+          id.translate(cam.pos.xyz);
+          cube_map.draw(cmd, *skybox, id);
+
           vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline);
           vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                   *pipeline, 0, 1, &cam_set, 0, 0);
@@ -171,19 +187,16 @@ int main() {
           vkCmdPushConstants(cmd, *pipeline, 17, 0, 64, &cam.view);
           vkCmdPushConstants(cmd, *pipeline, 17, 64, 64, &cam.prj);
 
-          //model0.draw(cmd, *pipeline, mat(0.01));
+          model0.draw(cmd, *pipeline, mat(0.01));
           model1.draw(cmd, *pipeline, mat(1));
           model2.draw(cmd, *pipeline, mat(1));
           model3.draw(cmd, *pipeline, m3);
-
-          vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *skybox);
-          auto id = mat(10000);
-          id.translate(cam.pos.xyz);
-          cube_map.draw(cmd, *skybox, id);
         },
         [&]() {
           imgui_win("Pipeline state", [&]() {
             ImGui::Text("%5f", 1.f / dt);
+            auto fwd = cam.view[2];
+            ImGui::Text("%5f %5f %5f", (f32)fwd.x, (f32)fwd.y, (f32)fwd.z);
             if (ImGui::RadioButton("Polygon Fill",
                                    pipeline->mode == VK_POLYGON_MODE_FILL))
               pipeline->set_mode(VK_POLYGON_MODE_FILL);
@@ -203,7 +216,7 @@ int main() {
                 ImGui::SliderInt("Height", (i32*)&extent.height, 400, 1080)) {
               xofo::resize(extent);
             }
-            if (ImGui::Button("Reload shaders")) {
+            if (ImGui::Button("Recompile")) {
               pipeline->recompile();
             }
             ImGui::DragFloat4("Angle Axis  0", (float*)&ax, 0.005, -10, 10);

@@ -15,7 +15,7 @@ struct Camera {
 
   void set_prj(f32 x, f32 y) {
     f32 fov = 90 * RADIAN;
-    prj = perspective(fov, fov * y / x, 0.01, 4000);
+    prj = perspective(fov, fov * y / x, 0.001, 4000);
   }
 
   void update(vec2 md, f32 fwd, f32 lr, f32 dt) {

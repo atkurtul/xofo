@@ -607,6 +607,13 @@ void xofo::init() {
 
     const char* ext[] = {"VK_KHR_swapchain"};
 
+    VkPhysicalDeviceFeatures features = {
+        .sampleRateShading = 1,
+        .fillModeNonSolid = 1,
+        .samplerAnisotropy = 1,
+        .vertexPipelineStoresAndAtomics = 1,
+    };
+
     VkDeviceCreateInfo info = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
         .queueCreateInfoCount = 1,
@@ -615,6 +622,7 @@ void xofo::init() {
         .ppEnabledLayerNames = layer,
         .enabledExtensionCount = 1,
         .ppEnabledExtensionNames = ext,
+        .pEnabledFeatures = &features,
     };
 
     CHECKRE(vkCreateDevice(vk, &info, 0, &g_dev));
@@ -664,8 +672,9 @@ VkSampler xofo::create_sampler(VkSamplerAddressMode mode, uint mip) {
       .addressModeU = mode,
       .addressModeV = mode,
       .addressModeW = mode,
-      //.anisotropyEnable = 1,
-      //.maxAnisotropy = 1,
+      .mipLodBias = 0.0f,
+      .anisotropyEnable = 1,
+      .maxAnisotropy = 16,
       .compareOp = VK_COMPARE_OP_NEVER,
       .maxLod = (float)mip,
       .borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,

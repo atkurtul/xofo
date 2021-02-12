@@ -52,9 +52,10 @@ Box<Image> Image::mk(VkImageCreateInfo const& info, Type type) {
 
   VkImageSubresourceRange subrange = {
       .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-      .levelCount = 1,
+      .levelCount = info.mipLevels,
       .layerCount = 1,
   };
+  
   auto view_type = VK_IMAGE_VIEW_TYPE_2D;
   switch (type) {
     case Type::DepthBuffer:

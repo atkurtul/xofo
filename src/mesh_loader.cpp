@@ -71,6 +71,11 @@ void MeshLoader::load_geometry(char* buffer) {
       if (norm2 && mesh->mBitangents)
         memcpy(buffer + norm2, mesh->mBitangents + j, 12);
       buffer += stride;
+
+
+      if (mesh->HasVertexColors(0)) {
+        cerr << "Has colors: " << file <<"\n";
+      }
     }
 
     for (u32 j = 0; j < mesh->mNumFaces; ++j) {

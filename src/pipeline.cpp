@@ -1,3 +1,5 @@
+#include "pipeline.h"
+#include <memory>
 #include <vulkan/vulkan_core.h>
 #include <xofo.h>
 #include <algorithm>
@@ -168,6 +170,10 @@ static ShaderData extract_input_state_and_uniforms(
   return {attr, stride};
 }
 
+Box<Pipeline> Pipeline::mk(string const& shader) {
+  return Box<Pipeline>(new Pipeline(shader));
+}
+
 Pipeline::Pipeline(string const& shader)
     : shader(shader),
       shaders{
@@ -241,7 +247,7 @@ Pipeline::Pipeline(string const& shader)
   create();
 }
 
-void Pipeline::reload_shaders() {
+void Pipeline::recompile() {
   vkDestroyShaderModule(vk, shaders[0], 0);
   vkDestroyShaderModule(vk, shaders[1], 0);
   shaders[0] = compile_shader(shader + ".vert", shaderc_vertex_shader);
@@ -299,14 +305,16 @@ void Pipeline::create() {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
       .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
   };
+
   VkPipelineDepthStencilStateCreateInfo DepthStencilState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
       .depthTestEnable = depth_test,
       .depthWriteEnable = depth_write,
-      .depthCompareOp = VK_COMPARE_OP_LESS,
+      .depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
   };
+
   VkPipelineColorBlendAttachmentState Attachments = {
-      .blendEnable = 1,
+      .blendEnable = 0,
       .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
       .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
       .colorBlendOp = VK_BLEND_OP_ADD,

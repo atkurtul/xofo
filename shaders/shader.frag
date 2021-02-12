@@ -17,7 +17,39 @@ layout(set = 0, binding = 0) uniform UBO00 {
 }
 cam;
 
+layout(push_constant) uniform push_block {
+  mat4 view;
+  mat4 prj;
+  mat4 xf;
+}
+camx;
+
+// toon
+
 void main1() {
+  vec3 object_color = texture(albedo, tex).rgb;
+  vec3 norm = texture(normal, tex).rgb * 2 - 1;
+  norm = normalize(norm_mat * norm);
+
+  vec3 light_dir = normalize(cam.light_pos.xyz - frag_pos);
+  float intensity = dot(norm, light_dir);
+
+  if (intensity > 0.98)
+    object_color *= 1.5;
+  else if (intensity > 0.9)
+    object_color *= 1.0;
+  else if (intensity > 0.5)
+    object_color *= 0.6;
+  else if (intensity > 0.25)
+    object_color *= 0.4;
+  else
+    object_color *= 0.2;
+  // Desaturate a bit
+//  object_color = vec3(mix(object_color, vec3(dot(vec3(0.2126, 0.7152, 0.0722), object_color)), 0.1));
+  out_color = vec4(object_color * 2, 1.0);
+}
+
+void main0() {
   vec3 object_color = texture(albedo, tex).rgb;
   vec3 norm = texture(normal, tex).rgb * 2 - 1;
   norm = normalize(norm_mat * norm);
@@ -26,7 +58,7 @@ void main1() {
 
   vec3 light_color = cam.light_color.xyz;
 
-  vec3 diffuse = max(dot(norm, light_dir), 0.0) * light_color;
+  vec3 diffuse = max(dot(norm_mat[2].xyz, light_dir), 0.0) * light_color;
 
   vec3 ambient = vec3(0.45);
   vec3 final_color = (ambient + diffuse) * object_color;
@@ -80,7 +112,7 @@ void main() {
   float NdotL = max(dot(norm, L), 0.0);
   vec3 Lo = (kD * col / PI + specular) * radiance * NdotL;
 
-  vec3 ambient = vec3(0.03) * col;
+  vec3 ambient = vec3(0.01) * col;
   vec3 color = ambient + Lo;
 
   color = color / (color + vec3(1.0));

@@ -26,5 +26,5 @@ void main() {
   vec3 N = normalize(cam.xf * vec4(in_norm0, 0.0)).xyz;
   norm_mat = mat3(T, B, N);
   out_tex = in_tex;
-  frag_pos = pos.xyz;
+  frag_pos = (cam.xf * pos).xyz;
 }

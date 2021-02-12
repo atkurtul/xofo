@@ -20,6 +20,9 @@ using vec4d = mango::float64x4;
 using vec2i = mango::int32x2;
 using vec3i = mango::int32x3;
 using vec4i = mango::int32x4;
+using vec2u = mango::uint32x2;
+using vec3u = mango::uint32x3;
+using vec4u = mango::uint32x4;
 using angax = mango::AngleAxis;
 
 using mango::transpose;

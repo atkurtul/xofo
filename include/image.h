@@ -54,6 +54,7 @@ struct Texture : Image  {
 };
 
 Box<Texture> load_cubemap(std::string file, VkFormat format);
+Box<Texture> load_cubemap2(std::string folder, VkFormat format) ;
 }  // namespace xofo
 
 
