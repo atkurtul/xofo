@@ -8,6 +8,8 @@
 using namespace std;
 using namespace xofo;
 
+vector<Pipeline*> Pipeline::pipelines;
+
 static string read_to_string(const char* file) {
   ifstream t(file);
   return string(istreambuf_iterator<char>(t), istreambuf_iterator<char>());
@@ -168,18 +170,20 @@ static StageInputs extract_input_state_and_uniforms(
   return input;
 }
 
-Box<Pipeline> Pipeline::mk(string const& shader) {
-  auto re = Box<Pipeline>(new Pipeline(shader));
+Box<Pipeline> Pipeline::mk(string const& shader, PipelineState const& state) {
+  auto re = Box<Pipeline>(new Pipeline(shader, state));
   xofo::register_recreation_callback([&](auto extent) { re->reset(); });
+  pipelines.push_back(re.get());
   return re;
 }
 
-Pipeline::Pipeline(string const& shader)
+Pipeline::Pipeline(string const& shader, PipelineState const& state)
     : shader(shader),
       shaders{
           compile_shader(shader + ".vert", shaderc_vertex_shader),
           compile_shader(shader + ".frag", shaderc_fragment_shader),
-      } {
+      },
+      state(state) {
   vector<vector<VkDescriptorSetLayoutBinding>> bindings;
 
   inputs = extract_input_state_and_uniforms(
@@ -317,7 +321,7 @@ void Pipeline::create() {
 
   VkPipelineInputAssemblyStateCreateInfo InputAssemblyState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-      .topology = topology,
+      .topology = state.topology,
   };
 
   auto extent = xofo::extent();
@@ -343,8 +347,8 @@ void Pipeline::create() {
 
   VkPipelineDepthStencilStateCreateInfo DepthStencilState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-      .depthTestEnable = depth_test,
-      .depthWriteEnable = depth_write,
+      .depthTestEnable  = state.depth_test,
+      .depthWriteEnable = state.depth_write,
       .depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
   };
 
@@ -372,9 +376,9 @@ void Pipeline::create() {
 
   VkPipelineRasterizationStateCreateInfo RasterizationState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-      .polygonMode = mode,
-      .cullMode = culling,
-      .lineWidth = line_width};
+      .polygonMode = state.polygon,
+      .cullMode    = state.culling,
+      .lineWidth   = state.line_width};
 
   VkGraphicsPipelineCreateInfo info = {
       .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
@@ -395,19 +399,10 @@ void Pipeline::create() {
   CHECKRE(vkCreateGraphicsPipelines(vk, 0, 1, &info, 0, &pipeline));
 }
 
-VkDescriptorSet Pipeline::alloc_set(u32 n) {
-  VkDescriptorSetAllocateInfo info = {
-      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-      .descriptorPool = pools.at(n),
-      .descriptorSetCount = 1,
-      .pSetLayouts = &set_layouts.at(n).layout,
-  };
-  VkDescriptorSet set;
-  CHECKRE(vkAllocateDescriptorSets(vk, &info, &set));
-  return set;
-}
 
 Pipeline::~Pipeline() {
+  pipelines.erase(find(pipelines.begin(), pipelines.end(), this));
+
   vkDestroyShaderModule(vk, shaders[0], 0);
   vkDestroyShaderModule(vk, shaders[1], 0);
   vkDestroyPipeline(vk, pipeline, 0);

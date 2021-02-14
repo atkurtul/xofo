@@ -9,14 +9,15 @@
 namespace xofo {
 
 struct Model {
+  std::string origin;
   std::vector<Mesh> meshes;
   std::vector<Material> mats;
-  std::vector<VkDescriptorSet> sets;
+  // std::vector<VkDescriptorSet> sets;
   Rc<Buffer> buffer;
   vec3 pos;
   f32 scale;
 
-  Model(const char* path, Pipeline& pipeline) : scale(1), pos(0) {
+  Model(const char* path, Pipeline& pipeline) : origin(path), scale(1), pos(0) {
     MeshLoader mesh_loader(path, pipeline.inputs.per_vertex.stride);
     mesh_loader.tex = 12;
     mesh_loader.norm0 = 20;
@@ -30,23 +31,6 @@ struct Model {
     auto staging = Buffer::mk(mesh_loader.size, Buffer::Src, Buffer::Mapped);
     mats = mesh_loader.load_materials();
     mesh_loader.load_geometry(staging->mapping);
-    sets.reserve(mats.size());
-
-    for (auto& mat : mats) {
-      auto set = pipeline.alloc_set(1);
-
-      switch (pipeline.set_layouts[1].bindings.size()) {
-        default:
-        case 3:
-          mat.metallic->bind_to_set(set, 2);
-        case 2:
-          mat.normal->bind_to_set(set, 1);
-        case 1:
-          mat.diffuse->bind_to_set(set, 0);
-        case 0: void();
-      }
-      sets.push_back(set);
-    }
 
     xofo::execute([&](auto cmd) {
       VkBufferCopy reg = {0, 0, mesh_loader.size};
@@ -54,12 +38,27 @@ struct Model {
     });
   }
 
-  void draw(VkPipelineLayout layout, mat mat, VkCommandBuffer cmd = vk) {
-    vkCmdPushConstants(cmd, layout, 17, 128, 64, &mat);
+  void draw(Pipeline& pipeline, mat mat, VkCommandBuffer cmd = vk) {
+    pipeline.push(mat, 128);
 
     for (auto& mesh : meshes) {
-      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 1,
-                              1, &sets.at(mesh.mat), 0, 0);
+      for (auto& mat : mats) {
+        auto set = pipeline.get_set(
+            [&](auto set) {
+              switch (pipeline.set_layouts[1].bindings.size()) {
+                default:
+                case 3:
+                  mat.metallic->bind_to_set(set, 2);
+                case 2:
+                  mat.normal->bind_to_set(set, 1);
+                case 1:
+                  mat.diffuse->bind_to_set(set, 0);
+                case 0:;
+              }
+            },
+            1, mat.metallic.get(), mat.normal.get(), mat.diffuse.get());
+        pipeline.bind_set(set, 1);
+      }
       vkCmdBindVertexBuffers(cmd, 0, 1, &buffer->buffer, &mesh.vertex_offset);
       vkCmdBindIndexBuffer(cmd, *buffer, mesh.index_offset,
                            VK_INDEX_TYPE_UINT32);

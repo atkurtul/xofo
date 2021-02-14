@@ -1,63 +1,12 @@
-
-#include <vulkan/vulkan_core.h>
 #include <xofo.h>
-#include <mango/image/surface.hpp>
-#include "core.h"
 #include "imgui.h"
 
 using namespace std;
-
-template <class F>
-void imgui_win(const char* title, F&& f) {
-  ImGui::Begin(title);
-  f();
-  ImGui::End();
-}
-
-struct Light {
-  vec4 pos;
-  vec4 color;
-
-  void integrate(vec3& meta, f32 dt) {
-    meta.x += dt * meta.y * 0.1;
-    const float angle = 2 * 3.1415 * meta.x;
-    pos = vec4(cosf(angle) * meta.z, 0, sinf(angle) * meta.z, 1);
-  }
-
-  Light() {
-    color = vec4{mango::clamp(float(rand() % 255) / 255, 0.5f, 1.f),
-                 mango::clamp(float(rand() % 255) / 255, 0.5f, 1.f),
-                 mango::clamp(float(rand() % 255) / 255, 0.5f, 1.f), 1};
-    pos = vec4{mango::clamp(float((rand() % 127) - 127) / 127, -1.f, 1.f),
-               mango::clamp(float((rand() % 127) - 127) / 127, -1.f, 1.f),
-               mango::clamp(float((rand() % 127) - 127) / 127, -1.f, 1.f), 1};
-  }
-};
-
-void integrate_lights(f32 dt, vector<Light>& lights, vector<vec3>& meta) {
-  u32 i = 0;
-  for (auto& light : meta) {
-    lights.at(i).integrate(light, dt);
-  }
-}
-
-void make_lights(u32 n, f32 r, vector<Light>& lights, vector<vec3>& meta) {
-  n = 1;
-  lights.clear();
-  lights.resize(n);
-  meta.resize(n);
-  for (auto& meta : meta) {
-    meta.x = float(rand() % 255) / 255;
-    meta.y = 0.01 + 0.5 * float(rand() % 255) / 255;
-    meta.z = r * (float(rand() % 255) / 255.f + 0.01);
-  }
-}
 using namespace xofo;
 
 struct CubeMap {
   Box<Texture> texture;
   Box<Buffer> buffer;
-  VkDescriptorSet set;
   Mesh mesh;
 
   CubeMap(Pipeline& pipeline) {
@@ -82,53 +31,85 @@ struct CubeMap {
       vkCmdCopyBuffer(cmd, *staging, *buffer, 1, &reg);
     });
 
-    set = pipeline.alloc_set(0);
     texture = load_cubemap_single_file("models/Daylight.png",
                                        VK_FORMAT_R8G8B8A8_SRGB);
-    texture->bind_to_set(set, 0);
+    // set = pipeline.create_set(0, texture.get());
+    // texture->bind_to_set(set, 0);
   };
 
   void draw(Pipeline& pipeline, mat mat, VkCommandBuffer cmd = vk) {
     pipeline.push(mat, 128);
-    pipeline.bind_set(set);
+    auto set = pipeline.get_set([&](auto set) { texture->bind_to_set(set, 0); },
+                                0, texture.get());
+    pipeline.bind_set(set, 0);
 
     buffer->bind_vertex();
     vkCmdBindIndexBuffer(cmd, *buffer, mesh.index_offset, VK_INDEX_TYPE_UINT32);
-
     vkCmdDrawIndexed(cmd, mesh.indices >> 2, 1, 0, 0, 0);
   }
 };
 
-void remake_lights(u32 n, vector<Light>& lights, vector<vec3>& metas) {
-  lights = vector<Light>(n);
-  metas = vector<vec3>(n);
-  for (auto& m : metas) {
-    m.x = 1;
-    m.y = 1;
-    m.z = 16;
+template <class V>
+bool imgui_combo(const char* mode_name,
+                 vector<pair<string, V>> const& map,
+                 u32& selected) {
+  bool re = false;
+  if (ImGui::BeginCombo(mode_name, map[selected].first.data())) {
+    u32 i = 0;
+    for (auto& [k, v] : map) {
+      bool is_selected = i == selected;
+      if (ImGui::Selectable(map[i].first.data(), is_selected)) {
+        selected = i;
+        re = true;
+      }
+      if (is_selected)
+        ImGui::SetItemDefaultFocus();
+      i++;
+    }
+    ImGui::EndCombo();
   }
+  return re;
 }
+
+void show_pipeline_state(Pipeline& pipeline) {
+  ImGui::Begin(pipeline.shader.data());
+  if (imgui_combo("Cull mode", CullModeFlagBits_map,
+                  (u32&)pipeline.state.culling) |
+      imgui_combo("Polygon mode", PolygonMode_map,
+                  (u32&)pipeline.state.polygon) |
+      imgui_combo("Topology", PrimitiveTopology_map,
+                  (u32&)pipeline.state.topology) |
+      ImGui::DragFloat("Line width", &pipeline.state.line_width, 0.1, 0.1, 32) |
+      ImGui::Checkbox("Depth test", &pipeline.state.depth_test) |
+      ImGui::Checkbox("Depth write", &pipeline.state.depth_write)) {
+    cout << "Cull mode: " << pipeline.state.culling << "\n";
+    pipeline.reset();
+  }
+  ImGui::End();
+}
+
+void show_mesh_state(Mesh const& mesh) {
+  ImGui::Text("Number of vertices: %lu", mesh.vertices);
+  ImGui::Text("Number of indices: %lu", mesh.indices);
+  ImGui::Text("Material index %u", mesh.mat);
+}
+
+void show_model(Model const& model) {}
 
 int main() {
   xofo::init();
   auto pipeline = Pipeline::mk("shaders/shader");
-  auto skybox = Pipeline::mk("shaders/skybox");
-  skybox->depth_write = 0;
-  //  skybox->depth_test = 0;
-  skybox->reset();
+  auto skybox = Pipeline::mk("shaders/skybox", {.depth_write = 0});
 
   CubeMap cube_map(*skybox);
 
-  auto grid_pipe = Pipeline::mk("shaders/grid");
-  grid_pipe->mode = (VK_POLYGON_MODE_LINE);
-  grid_pipe->topology = (VK_PRIMITIVE_TOPOLOGY_LINE_LIST);
-  grid_pipe->line_width = (1.2f);
-  grid_pipe->reset();
+  auto grid_pipe =
+      Pipeline::mk("shaders/grid", {.polygon = VK_POLYGON_MODE_LINE,
+                                    .topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST,
+                                    .line_width = 1.2f});
 
   auto uniform =
       xofo::Buffer::mk(65536, xofo::Buffer::Uniform, xofo::Buffer::Mapped);
-
-  auto cam_set = uniform->bind_to_set(pipeline->alloc_set(0), 0);
 
   // Model model0("models/sponza/sponza.gltf", *pipeline);
 
@@ -147,11 +128,6 @@ int main() {
   mat m3(0.1);
   vec4 ax(0, 0, 0, 1);
   vec3 xxf(0);
-
-  vector<Light> lights;
-  vector<vec3> metas;
-  u32 n_lights = 32;
-  remake_lights(n_lights, lights, metas);
 
   auto grid_buffer = Buffer::mk(65536, Buffer::Vertex, Buffer::Mapped);
   for (u32 i = 0; i <= 2000; ++i) {
@@ -175,10 +151,6 @@ int main() {
       xofo::hide_mouse(0);
       mdelta = {};
     }
-    u32 i = 0;
-    for (auto& light : lights) {
-      light.integrate(metas[i++], dt);
-    }
 
     f32 w = xofo::get_key(Key::W);
     f32 a = xofo::get_key(Key::A);
@@ -187,8 +159,7 @@ int main() {
     cam.update(mdelta, s - w, d - a, dt * 5 * speed);
 
     uniform->copy(cam.pos);
-    uniform->copy(vec4i(n_lights), 16);
-    uniform->copy(lights.size() * sizeof(Light), lights.data(), 32);
+
     auto inv_view = mango::inverse(cam.view);
     if (get_key(Key::E) | 1) {
       auto xf = mat(1);
@@ -209,8 +180,11 @@ int main() {
           cube_map.draw(*skybox, id);
 
           pipeline->bind();
-          pipeline->bind_set(cam_set);
 
+          auto cam_set =
+              pipeline->get_set([&](auto set) { uniform->bind_to_set(set, 0); },
+                                0, uniform.get());
+          pipeline->bind_set(cam_set, 0);
           model0.draw(*pipeline, mat(1));
           // model1.draw(cmd, *pipeline, mat(1));
           // model2.draw(cmd, *pipeline, mat(1));
@@ -221,42 +195,58 @@ int main() {
           vkCmdDraw(vk, 8008, 1, 0, 0);
         },
         [&]() {
-          imgui_win("Recompiler", [&]() {
-            if (ImGui::Button("Recompile")) {
-              pipeline->recompile();
+          using namespace ImGui;
+          static bool show_pipeline = false;
+          if (show_pipeline && Begin("Create pipeline", &show_pipeline)) {
+            if (Button("Create")) {
+              show_pipeline = false;
             }
-          });
-          imgui_win("Pipeline state", [&]() {
-            ImGui::Text("%5f", 1.f / dt);
-            auto fwd = cam.view[2];
-            ImGui::Text("%5f %5f %5f", (f32)fwd.x, (f32)fwd.y, (f32)fwd.z);
-            if (ImGui::RadioButton("Polygon Fill",
-                                   pipeline->mode == VK_POLYGON_MODE_FILL))
-              pipeline->set_mode(VK_POLYGON_MODE_FILL);
-            if (ImGui::RadioButton("Polygon Line",
-                                   pipeline->mode == VK_POLYGON_MODE_LINE))
-              pipeline->set_mode(VK_POLYGON_MODE_LINE);
-            if (ImGui::RadioButton("Polygon Point",
-                                   pipeline->mode == VK_POLYGON_MODE_POINT))
-              pipeline->set_mode(VK_POLYGON_MODE_POINT);
+            static u32 cull = 0;
+            static u32 polygon = 0;
+            static u32 topology = 0;
+            static f32 line_width = 1.f;
+            static bool depth_test = true;
+            static bool depth_write = true;
+            static char shader_path[256] = {};
+            imgui_combo("Cull mode", CullModeFlagBits_map, cull);
+            imgui_combo("Polygon mode", PolygonMode_map, polygon);
+            imgui_combo("Topology", PrimitiveTopology_map, topology);
+            DragFloat("Line width", &line_width, 0.1, 0.1, 32);
+            Checkbox("Depth test", &depth_test);
+            Checkbox("Depth write", &depth_write);
+            InputText("Shader path", shader_path, 256);
+            End();
+          }
 
-            if (ImGui::Checkbox("Depth Test", &pipeline->depth_test))
-              pipeline->reset();
-            if (ImGui::Checkbox("Depth Write", &pipeline->depth_write))
-              pipeline->reset();
-            auto extent = xofo::extent();
-            if (ImGui::SliderInt("Width", (i32*)&extent.width, 400, 1920) ||
-                ImGui::SliderInt("Height", (i32*)&extent.height, 400, 1080)) {
-              xofo::resize(extent);
+          BeginMainMenuBar();
+          {
+            if (BeginMenu("File")) {
+              void ShowExampleMenuFile();
+              ShowExampleMenuFile();
+              EndMenu();
             }
-            ImGui::DragFloat("Speed", &speed, 0.05, 0.5f, 100.f, "%f", ImGuiSliderFlags_Logarithmic);
-            if (ImGui::SliderInt("Lights", (i32*)&n_lights, 0, 128)) {
-              remake_lights(n_lights, lights, metas);
+            if (BeginMenu("New")) {
+              if (MenuItem("Pipeline")) {
+                show_pipeline = true;
+              }
+              EndMenu();
             }
+            EndMenuBar();
+          }
 
-            ImGui::DragFloat4("Angle Axis  0", (f32*)&ax, 0.005, -10, 10);
-            ImGui::DragFloat3("Offset", (f32*)&xxf, 0.05, -2, 2);
-          });
+          for (auto pipe : Pipeline::pipelines) {
+            show_pipeline_state(*pipe);
+          }
+          ImGui::Begin(model0.origin.data());
+          {
+            u32 idx = 0;
+            for (auto mesh : model0.meshes) {
+              if (TreeNode(("Mesh [" + to_string(idx++) + "]").data())) {
+                show_mesh_state(mesh);
+              }
+            }
+            ImGui::End();
+          }
         });
   }
   CHECKRE(vkDeviceWaitIdle(xofo::vk));

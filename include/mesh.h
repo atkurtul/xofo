@@ -2,6 +2,7 @@
 #define A5C13A51_878E_410E_B45F_954C97F8D972
 
 #include "image.h"
+#include "pipeline.h"
 
 
 namespace xofo {
@@ -19,6 +20,7 @@ struct Material {
   Rc<Texture> normal;
   Rc<Texture> metallic;
   vec3 color;
+
   Material() {
     u8 black[4] = {0, 0, 0, 255};
     u8 blue[4] = {0, 0, 255, 255};
@@ -34,6 +36,10 @@ struct Material {
     this->diffuse  = diffuse;
     this->normal   = normal;
     this->metallic = metallic;
+  }
+
+  void bind(Pipeline& pipe, VkCommandBuffer cmd = vk) {
+    
   }
 };
 

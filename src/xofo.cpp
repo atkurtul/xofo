@@ -36,19 +36,6 @@ static i32 g_scroll_wheel;
 static f64 g_time = 0;
 static f64 g_dt = 0;
 
-VulkanProxy::operator VkInstance() {
-  return g_instance;
-}
-VulkanProxy::operator VkDevice() {
-  return g_dev;
-}
-VulkanProxy::operator VkPhysicalDevice() {
-  return g_pdev;
-}
-VulkanProxy::operator VmaAllocator() {
-  return g_allocator;
-}
-
 struct {
   VkCommandPool pool;
   VkSwapchainKHR swapchain;
@@ -273,6 +260,19 @@ struct {
   }
 } g_res;
 
+VulkanProxy::operator VkInstance() {
+  return g_instance;
+}
+VulkanProxy::operator VkDevice() {
+  return g_dev;
+}
+VulkanProxy::operator VkPhysicalDevice() {
+  return g_pdev;
+}
+VulkanProxy::operator VmaAllocator() {
+  return g_allocator;
+}
+
 VulkanProxy::operator VkCommandBuffer() {
   return g_res.frames[g_res.curr].cmd;
 }
@@ -408,16 +408,39 @@ VkRenderPass xofo::renderpass() {
 u32 xofo::buffer_count() {
   return g_res.frames.size();
 }
-
+void ShowExampleMenuFile();
 void xofo::draw(function<void(VkCommandBuffer)> const& f,
                 function<void()> const& imgui) {
+  // imgui
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
+
+  if (0 & ImGui::BeginMainMenuBar()) {
+    if (ImGui::BeginMenu("File")) {
+      ShowExampleMenuFile();
+      ImGui::EndMenu();
+    }
+    if (ImGui::BeginMenu("Edit")) {
+      if (ImGui::MenuItem("Undo", "CTRL+Z")) {
+      }
+      if (ImGui::MenuItem("Redo", "CTRL+Y", false, false)) {
+      }  // Disabled item
+      ImGui::Separator();
+      if (ImGui::MenuItem("Cut", "CTRL+X")) {
+      }
+      if (ImGui::MenuItem("Copy", "CTRL+C")) {
+      }
+      if (ImGui::MenuItem("Paste", "CTRL+V")) {
+      }
+      ImGui::EndMenu();
+    }
+    ImGui::EndMainMenuBar();
+  }
+
   imgui();
+
   ImGui::Render();
-
   u32 prev = g_res.curr;
-
   while (vkAcquireNextImageKHR(vk, g_res.swapchain, -1,
                                g_res.frames[prev].acquire, 0,
                                &g_res.curr) != VK_SUCCESS) {
@@ -494,16 +517,16 @@ void xofo::draw(function<void(VkCommandBuffer)> const& f,
 
 void xofo::set_cursor_shape(int shape) {
   static GLFWcursor* cursors[] = {
-    glfwCreateStandardCursor(GLFW_ARROW_CURSOR),
-    glfwCreateStandardCursor(GLFW_IBEAM_CURSOR),
-    glfwCreateStandardCursor(GLFW_CROSSHAIR_CURSOR),
-    glfwCreateStandardCursor(GLFW_HAND_CURSOR),
-    glfwCreateStandardCursor(GLFW_HRESIZE_CURSOR),
-    glfwCreateStandardCursor(GLFW_VRESIZE_CURSOR),
-    glfwCreateStandardCursor(GLFW_CONNECTED),
-    glfwCreateStandardCursor(GLFW_DISCONNECTED),
-    glfwCreateStandardCursor(GLFW_JOYSTICK_HAT_BUTTONS),
-    glfwCreateStandardCursor(GLFW_COCOA_CHDIR_RESOURCES),
+      glfwCreateStandardCursor(GLFW_ARROW_CURSOR),
+      glfwCreateStandardCursor(GLFW_IBEAM_CURSOR),
+      glfwCreateStandardCursor(GLFW_CROSSHAIR_CURSOR),
+      glfwCreateStandardCursor(GLFW_HAND_CURSOR),
+      glfwCreateStandardCursor(GLFW_HRESIZE_CURSOR),
+      glfwCreateStandardCursor(GLFW_VRESIZE_CURSOR),
+      glfwCreateStandardCursor(GLFW_CONNECTED),
+      glfwCreateStandardCursor(GLFW_DISCONNECTED),
+      glfwCreateStandardCursor(GLFW_JOYSTICK_HAT_BUTTONS),
+      glfwCreateStandardCursor(GLFW_COCOA_CHDIR_RESOURCES),
   };
   glfwSetCursor(g_glfw, cursors[shape]);
 }
@@ -514,7 +537,6 @@ void xofo::resize(VkExtent2D v) {
 }
 
 bool xofo::get_key(enum Key key) {
-
   return glfwGetKey(g_glfw, (i32)key);
 }
 
@@ -553,9 +575,8 @@ int xofo::poll() {
   return !glfwWindowShouldClose(g_glfw) & !glfwGetKey(g_glfw, GLFW_KEY_ESCAPE);
 }
 
-
 f64 xofo::aspect_ratio() {
-  return (f64) g_res.extent.width / g_res.extent.height;
+  return (f64)g_res.extent.width / g_res.extent.height;
 }
 
 f64 xofo::dt() {
@@ -735,4 +756,80 @@ VkSampler xofo::create_sampler(VkSamplerAddressMode mode, uint mip) {
   VkSampler sampler;
   CHECKRE(vkCreateSampler(vk, &info, 0, &sampler));
   return g_samplers[key] = sampler;
+}
+
+void ShowExampleMenuFile()
+{
+    ImGui::MenuItem("(demo menu)", NULL, false, false);
+    if (ImGui::MenuItem("New")) {}
+    if (ImGui::MenuItem("Open", "Ctrl+O")) {}
+    if (ImGui::BeginMenu("Open Recent"))
+    {
+        ImGui::MenuItem("fish_hat.c");
+        ImGui::MenuItem("fish_hat.inl");
+        ImGui::MenuItem("fish_hat.h");
+        if (ImGui::BeginMenu("More.."))
+        {
+            ImGui::MenuItem("Hello");
+            ImGui::MenuItem("Sailor");
+            if (ImGui::BeginMenu("Recurse.."))
+            {
+                ShowExampleMenuFile();
+                ImGui::EndMenu();
+            }
+            ImGui::EndMenu();
+        }
+        ImGui::EndMenu();
+    }
+    if (ImGui::MenuItem("Save", "Ctrl+S")) {}
+    if (ImGui::MenuItem("Save As..")) {}
+
+    ImGui::Separator();
+    if (ImGui::BeginMenu("Options"))
+    {
+        static bool enabled = true;
+        ImGui::MenuItem("Enabled", "", &enabled);
+        ImGui::BeginChild("child", ImVec2(0, 60), true);
+        for (int i = 0; i < 10; i++)
+            ImGui::Text("Scrolling Text %d", i);
+        ImGui::EndChild();
+        static float f = 0.5f;
+        static int n = 0;
+        ImGui::SliderFloat("Value", &f, 0.0f, 1.0f);
+        ImGui::InputFloat("Input", &f, 0.1f);
+        ImGui::Combo("Combo", &n, "Yes\0No\0Maybe\0\0");
+        ImGui::EndMenu();
+    }
+
+    if (ImGui::BeginMenu("Colors"))
+    {
+        float sz = ImGui::GetTextLineHeight();
+        for (int i = 0; i < ImGuiCol_COUNT; i++)
+        {
+            const char* name = ImGui::GetStyleColorName((ImGuiCol)i);
+            ImVec2 p = ImGui::GetCursorScreenPos();
+            ImGui::GetWindowDrawList()->AddRectFilled(p, ImVec2(p.x + sz, p.y + sz), ImGui::GetColorU32((ImGuiCol)i));
+            ImGui::Dummy(ImVec2(sz, sz));
+            ImGui::SameLine();
+            ImGui::MenuItem(name);
+        }
+        ImGui::EndMenu();
+    }
+
+    // Here we demonstrate appending again to the "Options" menu (which we already created above)
+    // Of course in this demo it is a little bit silly that this function calls BeginMenu("Options") twice.
+    // In a real code-base using it would make senses to use this feature from very different code locations.
+    if (ImGui::BeginMenu("Options")) // <-- Append!
+    {
+        static bool b = true;
+        ImGui::Checkbox("SomeOption", &b);
+        ImGui::EndMenu();
+    }
+
+    if (ImGui::BeginMenu("Disabled", false)) // Disabled
+    {
+        IM_ASSERT(0);
+    }
+    if (ImGui::MenuItem("Checked", NULL, true)) {}
+    if (ImGui::MenuItem("Quit", "Alt+F4")) {}
 }

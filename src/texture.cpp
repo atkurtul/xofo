@@ -10,6 +10,8 @@
 using namespace std;
 using namespace xofo;
 
+vector<Texture*> Texture::textures;
+
 struct ImageLayout {
   static constexpr auto Undefined = VK_IMAGE_LAYOUT_UNDEFINED;
   static constexpr auto General = VK_IMAGE_LAYOUT_GENERAL;
