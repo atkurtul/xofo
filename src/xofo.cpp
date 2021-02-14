@@ -1,4 +1,7 @@
 
+#include <vulkan/vulkan_core.h>
+#include "core.h"
+#include "imgui.h"
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
 
@@ -21,15 +24,17 @@ static VkQueue g_queue;
 static VmaAllocator g_allocator;
 static struct GLFWwindow* g_glfw;
 static VkSurfaceKHR g_surface;
-static vec4 g_color = vec4{0.2, 0.4, 0.8, 1};
+static vec4 g_color = vec4{0.2, 0.2, 0.2, 1};
 static vector<function<void(VkExtent2D)>> g_callbacks;
 static vector<function<void()>> g_destructors;
 static unordered_map<u64, VkSampler> g_samplers;
 
 static vec2 g_mpos;
 static vec2 g_mdelta;
-static double g_time = 0;
-static double g_dt = 0;
+static vec2 g_mnorm;
+static i32 g_scroll_wheel;
+static f64 g_time = 0;
+static f64 g_dt = 0;
 
 VulkanProxy::operator VkInstance() {
   return g_instance;
@@ -186,7 +191,6 @@ struct {
       vector<VkImage> images(count);
       vector<VkCommandBuffer> cmd(count);
       frames.resize(count);
-      cout << "Frame count " << count << "\n";
       CHECKRE(vkGetSwapchainImagesKHR(vk, swapchain, &count, images.data()));
       VkCommandBufferAllocateInfo info = {
           .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -220,7 +224,7 @@ struct {
           .layers = 1,
 
       };
-      cout << "Frame count 2 " << count << "\n";
+
       for (int i = 0; i < count; ++i) {
         frames[i].cmd = cmd[i];
         view.image = frames[i].img = images[i];
@@ -269,6 +273,10 @@ struct {
   }
 } g_res;
 
+VulkanProxy::operator VkCommandBuffer() {
+  return g_res.frames[g_res.curr].cmd;
+}
+
 static void init_imgui() {
   // Setup Dear ImGui context
   IMGUI_CHECKVERSION();
@@ -277,6 +285,16 @@ static void init_imgui() {
   // Setup Dear ImGui style
   ImGui::StyleColorsDark();
   // ImGui::StyleColorsClassic();
+  ImGui::StyleColorsLight();
+
+  ImGuiIO& io = ImGui::GetIO();
+  (void)io;
+  io.ConfigFlags |=
+      ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
+  // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad
+  // Controls
+  io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;  // Enable Docking
+  // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
   // Setup Platform/Renderer backends
   ImGui_ImplGlfw_InitForVulkan(g_glfw, true);
@@ -474,16 +492,38 @@ void xofo::draw(function<void(VkCommandBuffer)> const& f,
   }
 }
 
+void xofo::set_cursor_shape(int shape) {
+  static GLFWcursor* cursors[] = {
+    glfwCreateStandardCursor(GLFW_ARROW_CURSOR),
+    glfwCreateStandardCursor(GLFW_IBEAM_CURSOR),
+    glfwCreateStandardCursor(GLFW_CROSSHAIR_CURSOR),
+    glfwCreateStandardCursor(GLFW_HAND_CURSOR),
+    glfwCreateStandardCursor(GLFW_HRESIZE_CURSOR),
+    glfwCreateStandardCursor(GLFW_VRESIZE_CURSOR),
+    glfwCreateStandardCursor(GLFW_CONNECTED),
+    glfwCreateStandardCursor(GLFW_DISCONNECTED),
+    glfwCreateStandardCursor(GLFW_JOYSTICK_HAT_BUTTONS),
+    glfwCreateStandardCursor(GLFW_COCOA_CHDIR_RESOURCES),
+  };
+  glfwSetCursor(g_glfw, cursors[shape]);
+}
+
 void xofo::resize(VkExtent2D v) {
   glfwSetWindowSize(g_glfw, v.width, v.height);
   xofo::recreate();
 }
-bool xofo::get_key(char key) {
-  return glfwGetKey(g_glfw, key);
+
+bool xofo::get_key(enum Key key) {
+
+  return glfwGetKey(g_glfw, (i32)key);
 }
 
 bool xofo::mbutton(int lr) {
   return glfwGetMouseButton(g_glfw, lr);
+}
+
+int xofo::mscroll_wheel() {
+  return g_scroll_wheel;
 }
 
 void xofo::hide_mouse(bool state) {
@@ -492,42 +532,46 @@ void xofo::hide_mouse(bool state) {
 }
 
 int xofo::poll() {
-  static double timer = 0;
-  timer += g_dt;
-  if (timer > 0.4 && glfwGetKey(g_glfw, GLFW_KEY_SPACE)) {
-    auto input = glfwGetInputMode(g_glfw, GLFW_CURSOR);
-    glfwSetInputMode(g_glfw, GLFW_CURSOR,
-                     input == GLFW_CURSOR_DISABLED ? GLFW_CURSOR_NORMAL
-                                                   : GLFW_CURSOR_DISABLED);
-    timer = 0;
-    g_mdelta = {};
-    double x, y;
-    glfwGetCursorPos(g_glfw, &x, &y);
-    g_mpos = vec2{(f32)x, (f32)y};
-  }
+  g_scroll_wheel = 0;
   {
-    double curr = glfwGetTime();
+    f64 curr = glfwGetTime();
     g_dt = curr - g_time;
     g_time = curr;
   }
   {
-    double x, y;
+    f64 x, y;
     glfwGetCursorPos(g_glfw, &x, &y);
     vec2 curr = vec2{(f32)x, (f32)y};
     g_mdelta = curr - g_mpos;
     g_mpos = curr;
+    g_mnorm =
+        curr / vec2{(f32)g_res.extent.width, (f32)g_res.extent.height} * 2.f -
+        1.f;
   }
 
   glfwPollEvents();
   return !glfwWindowShouldClose(g_glfw) & !glfwGetKey(g_glfw, GLFW_KEY_ESCAPE);
 }
 
-double xofo::dt() {
+
+f64 xofo::aspect_ratio() {
+  return (f64) g_res.extent.width / g_res.extent.height;
+}
+
+f64 xofo::dt() {
   return g_dt;
 }
 
-vec2 xofo::mdelta() {
+vec2 xofo::mouse_delta() {
   return g_mdelta;
+}
+
+vec2 xofo::mouse_norm() {
+  return g_mnorm;
+}
+
+vec2 xofo::mouse_pos() {
+  return g_mpos;
 }
 
 void deinit() {
@@ -610,6 +654,7 @@ void xofo::init() {
     VkPhysicalDeviceFeatures features = {
         .sampleRateShading = 1,
         .fillModeNonSolid = 1,
+        .wideLines = 1,
         .samplerAnisotropy = 1,
         .vertexPipelineStoresAndAtomics = 1,
     };
@@ -645,6 +690,13 @@ void xofo::init() {
     glfwSetInputMode(g_glfw, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
     // glfwSetInputMode(glfw, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     CHECKRE(glfwCreateWindowSurface(g_instance, g_glfw, 0, &g_surface));
+
+    glfwSetDropCallback(g_glfw, [](auto win, auto i, auto str) {
+      cout << "Dropped : " << *str << "\n";
+    });
+
+    glfwSetScrollCallback(g_glfw,
+                          [](auto win, auto x, auto y) { g_scroll_wheel = y; });
   }
 
   g_res.init();

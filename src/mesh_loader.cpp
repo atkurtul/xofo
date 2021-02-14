@@ -53,7 +53,7 @@ std::vector<Mesh> MeshLoader::import(u32 flags) {
   return meshes;
 }
 
-void MeshLoader::load_geometry(char* buffer) {
+void MeshLoader::load_geometry(u8* buffer) {
   for (u32 i = 0; i < scene->mNumMeshes; ++i) {
     struct aiMesh* mesh = scene->mMeshes[i];
     for (u32 j = 0; j < mesh->mNumVertices; ++j) {

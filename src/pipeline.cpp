@@ -1,11 +1,6 @@
 #include "pipeline.h"
-#include <memory>
 #include <vulkan/vulkan_core.h>
 #include <xofo.h>
-#include <algorithm>
-
-#include <fstream>
-#include <unordered_map>
 
 #include <shaderc/shaderc.hpp>
 #include <spirv_cross/spirv_cross.hpp>
@@ -22,13 +17,14 @@ static vector<u32> compile_glsl(const char* file, shaderc_shader_kind stage) {
   auto src = read_to_string(file);
   shaderc::Compiler comp;
   shaderc::CompileOptions opt;
-  opt.SetOptimizationLevel(shaderc_optimization_level_performance);
+  // opt.SetOptimizationLevel(shaderc_optimization_level_performance);
 
   auto re = comp.CompileGlslToSpv(src.c_str(), src.size(), stage, file, opt);
   if (re.GetCompilationStatus()) {
     cerr << re.GetErrorMessage() << "\n";
     abort();
   }
+  cout << "Size is: " << re.end() - re.begin() << "\n";
   return vector<u32>(re.begin(), re.end());
 }
 
@@ -120,12 +116,7 @@ static void build_set_layouts(
   }
 }
 
-struct ShaderData {
-  vector<VkVertexInputAttributeDescription> attr;
-  u32 stride;
-};
-
-static ShaderData extract_input_state_and_uniforms(
+static StageInputs extract_input_state_and_uniforms(
     vector<u32> const& bytecode,
     VkShaderStageFlags stage,
     vector<vector<VkDescriptorSetLayoutBinding>>& bindings) {
@@ -148,30 +139,39 @@ static ShaderData extract_input_state_and_uniforms(
   if (stage != VK_SHADER_STAGE_VERTEX_BIT)
     return {};
 
-  vector<VkVertexInputAttributeDescription> attr(res.stage_inputs.size());
+  map<u32, VkVertexInputAttributeDescription> inputs;
+
   for (auto& input : res.stage_inputs) {
     auto loc = cc.get_decoration(input.id, spv::Decoration::DecorationLocation);
     auto ty = cc.get_type(input.type_id);
-
     VkFormat format = type_format(ty.basetype, ty.vecsize);
-    attr[loc].format = format;
-    attr[loc].location = loc;
-    attr[loc].offset = ty.vecsize * 4;
+    inputs[loc] = VkVertexInputAttributeDescription{
+        .location = loc,
+        .binding = loc >= 10,
+        .format = format,
+        .offset =
+            ty.vecsize * 4,  // this isnt offset. it will be calculated later
+    };
   }
 
-  u32 stride = 0;
-
-  for (auto& input : attr) {
-    auto tmp = stride;
-    stride += input.offset;
-    input.offset = tmp;
+  StageInputs input = {};
+  for (auto& [k, v] : inputs) {
+    auto* into = &input.per_vertex;
+    if (k >= 10) {
+      into = &input.per_instance;
+    }
+    into->attr.push_back(v);
+    into->attr.back().offset = into->stride;
+    into->stride += v.offset;
   }
 
-  return {attr, stride};
+  return input;
 }
 
 Box<Pipeline> Pipeline::mk(string const& shader) {
-  return Box<Pipeline>(new Pipeline(shader));
+  auto re = Box<Pipeline>(new Pipeline(shader));
+  xofo::register_recreation_callback([&](auto extent) { re->reset(); });
+  return re;
 }
 
 Pipeline::Pipeline(string const& shader)
@@ -182,11 +182,8 @@ Pipeline::Pipeline(string const& shader)
       } {
   vector<vector<VkDescriptorSetLayoutBinding>> bindings;
 
-  auto shader_data = extract_input_state_and_uniforms(
+  inputs = extract_input_state_and_uniforms(
       shaders[0].bytecode, VK_SHADER_STAGE_VERTEX_BIT, bindings);
-
-  this->attr = move(shader_data.attr);
-  this->stride = shader_data.stride;
 
   extract_input_state_and_uniforms(shaders[1].bytecode,
                                    VK_SHADER_STAGE_FRAGMENT_BIT, bindings);
@@ -270,28 +267,66 @@ void Pipeline::create() {
           .pName = "main",
       }};
 
-  VkVertexInputBindingDescription input_binding = {
-      .stride = stride,
-  };
+  vector<VkVertexInputBindingDescription> bindings;
 
   VkPipelineVertexInputStateCreateInfo VertexInputState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-      .vertexBindingDescriptionCount = 1,
-      .pVertexBindingDescriptions = &input_binding,
-      .vertexAttributeDescriptionCount = (u32)attr.size(),
-      .pVertexAttributeDescriptions = attr.data(),
   };
+
+  if (inputs.per_vertex.attr.size()) {
+    bindings.push_back(VkVertexInputBindingDescription{
+        .binding = 0,
+        .stride = inputs.per_vertex.stride,
+        .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+    });
+  }
+
+  if (inputs.per_instance.attr.size()) {
+    bindings.push_back(VkVertexInputBindingDescription{
+        .binding = 1,
+        .stride = inputs.per_instance.stride,
+        .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE,
+    });
+  }
+
+  vector<VkVertexInputAttributeDescription> inputs;
+
+  if (bindings.size()) {
+    inputs.reserve(this->inputs.per_vertex.attr.size() +
+                   this->inputs.per_instance.attr.size());
+
+    inputs.insert(inputs.end(), this->inputs.per_vertex.attr.begin(),
+                  this->inputs.per_vertex.attr.end());
+
+    inputs.insert(inputs.end(), this->inputs.per_instance.attr.begin(),
+                  this->inputs.per_instance.attr.end());
+
+    VertexInputState.vertexBindingDescriptionCount = (u32)bindings.size();
+    VertexInputState.pVertexBindingDescriptions = bindings.data();
+    VertexInputState.vertexAttributeDescriptionCount = (u32)inputs.size();
+    VertexInputState.pVertexAttributeDescriptions = inputs.data();
+
+    cout << "Input size: " << inputs.size() << "\n";
+    for (auto& input : inputs) {
+      cout << "\tlocation: " << input.location << "\n";
+      cout << "\tbinding: " << input.binding << "\n";
+      cout << "\tformat: " << input.format << "\n";
+      cout << "\toffset: " << input.offset << "\n--------------------\n";
+    }
+  }
 
   VkPipelineInputAssemblyStateCreateInfo InputAssemblyState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
       .topology = topology,
   };
+
   auto extent = xofo::extent();
   VkViewport Viewports = {
       .width = (f32)extent.width,
       .height = (f32)extent.height,
       .maxDepth = 1.f,
   };
+
   VkRect2D Scissors = {.extent = extent};
   VkPipelineViewportStateCreateInfo ViewportState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
@@ -324,11 +359,13 @@ void Pipeline::create() {
       .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
                         VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
   };
+
   VkPipelineColorBlendStateCreateInfo ColorBlendState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
       .attachmentCount = 1,
       .pAttachments = &Attachments,
   };
+
   VkPipelineDynamicStateCreateInfo DynamicState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
   };
@@ -336,8 +373,8 @@ void Pipeline::create() {
   VkPipelineRasterizationStateCreateInfo RasterizationState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
       .polygonMode = mode,
-      .cullMode = VK_CULL_MODE_BACK_BIT,
-      .lineWidth = 1.f};
+      .cullMode = culling,
+      .lineWidth = line_width};
 
   VkGraphicsPipelineCreateInfo info = {
       .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
@@ -354,15 +391,16 @@ void Pipeline::create() {
       .layout = layout,
       .renderPass = xofo::renderpass(),
   };
+
   CHECKRE(vkCreateGraphicsPipelines(vk, 0, 1, &info, 0, &pipeline));
 }
 
 VkDescriptorSet Pipeline::alloc_set(u32 n) {
   VkDescriptorSetAllocateInfo info = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-      .descriptorPool = pools[n],
+      .descriptorPool = pools.at(n),
       .descriptorSetCount = 1,
-      .pSetLayouts = &set_layouts[n].layout,
+      .pSetLayouts = &set_layouts.at(n).layout,
   };
   VkDescriptorSet set;
   CHECKRE(vkAllocateDescriptorSets(vk, &info, &set));

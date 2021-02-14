@@ -1,3 +1,4 @@
+#include "buffer.h"
 #include <image.h>
 #include <xofo.h>
 #include <cstdio>
@@ -314,7 +315,6 @@ u8* blurx(mango::Bitmap& bmap) {
   return re;
 }
 
-
 u8* blur(mango::Bitmap& bmap) {
   u8* re = (u8*)calloc(1, bmap.height * bmap.width * 4);
 
@@ -325,9 +325,9 @@ u8* blur(mango::Bitmap& bmap) {
         continue;
       }
       u8* addr = re + (i * 4) + (j * bmap.stride);
-      u8 sum1[4] = { 0 };
-      u8 sum2[4] = { 0 };
-      u8 sum3[4] = { 0 };
+      u8 sum1[4] = {0};
+      u8 sum2[4] = {0};
+      u8 sum3[4] = {0};
       add_pixel(sum1, bmap.address(i, j));
       add_pixel(sum1, bmap.address(i, j + 1));
       add_pixel(sum1, bmap.address(i, j - 1));
@@ -337,16 +337,23 @@ u8* blur(mango::Bitmap& bmap) {
       add_pixel(sum3, bmap.address(i - 1, j));
       add_pixel(sum3, bmap.address(i - 1, j + 1));
       add_pixel(sum3, bmap.address(i - 1, j - 1));
-      sum1[0] /= 3; sum2[0] /= 3; sum3[0] /= 3;
-      sum1[1] /= 3; sum2[1] /= 3; sum3[1] /= 3;
-      sum1[2] /= 3; sum2[2] /= 3; sum3[2] /= 3;
-      sum1[3] /= 3; sum2[3] /= 3; sum3[3] /= 3;
+      sum1[0] /= 3;
+      sum2[0] /= 3;
+      sum3[0] /= 3;
+      sum1[1] /= 3;
+      sum2[1] /= 3;
+      sum3[1] /= 3;
+      sum1[2] /= 3;
+      sum2[2] /= 3;
+      sum3[2] /= 3;
+      sum1[3] /= 3;
+      sum2[3] /= 3;
+      sum3[3] /= 3;
       add_pixel(addr, sum1);
       add_pixel(addr, sum2);
       add_pixel(addr, sum3);
-
     }
-    //cout << "WTf mann\n";
+    // cout << "WTf mann\n";
   }
   cout << "Done\n";
   return re;
@@ -384,7 +391,7 @@ Box<Texture> Texture::mk(string file, VkFormat format) {
   mango::Bitmap bitmap(file, mango::Format(32, mango::Format::UNORM,
                                            mango::Format::RGBA, 8, 8, 8, 8));
 
-  //auto* data = blur(bitmap);
+  // auto* data = blur(bitmap);
   return Texture::mk(bitmap.image, format, bitmap.width, bitmap.height);
 }
 
@@ -392,6 +399,8 @@ using namespace xofo;
 
 #include <ktx.h>
 #include <ktxvulkan.h>
+
+const char* err_code_str(KTX_error_code err);
 
 const char* err_code_str(KTX_error_code err) {
   switch (err) {
@@ -436,7 +445,7 @@ vector<u64> sub_vec(vector<u64> const& a, vector<u64> const& b) {
   return re;
 }
 
-Box<Texture> xofo::load_cubemap(string file, VkFormat format) {
+Box<Texture> xofo::load_cubemap_ktx(string file, VkFormat format) {
   ktxTexture* tex;
   ktxResult result = ktxTexture_CreateFromNamedFile(
       file.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &tex);
@@ -527,13 +536,13 @@ Box<Texture> xofo::load_cubemap(string file, VkFormat format) {
   return Box<Texture>((Texture*)image.release());
 }
 
-Box<Texture> xofo::load_cubemap2(string folder, VkFormat format) {
+Box<Texture> xofo::load_cubemap_6_files_from_folder(string folder, VkFormat format) {
   mango::Bitmap bitmaps[6] = {folder + "/posx.jpg", folder + "/negx.jpg",
                               folder + "/posy.jpg", folder + "/negy.jpg",
                               folder + "/posz.jpg", folder + "/negz.jpg"};
 
   u32 width = bitmaps[0].width;
-  u32 height = bitmaps[1].width;
+  u32 height = bitmaps[0].height;
 
   u32 mip = 1;
   u64 size = width * height * 4;
@@ -542,6 +551,126 @@ Box<Texture> xofo::load_cubemap2(string folder, VkFormat format) {
   for (u32 i = 0; i < 6; ++i) {
     memcpy(staging->mapping + size * i, bitmaps[i].image, size);
   }
+
+  // Create optimal tiled target image
+  VkImageCreateInfo image_info = {
+      .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+      // This flag is required for cube map images
+      .flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT,
+      .imageType = VK_IMAGE_TYPE_2D,
+      .format = format,
+      .extent = {width, height, 1},
+      .mipLevels = mip,
+      // Cube faces count as array layers in Vulkan
+      .arrayLayers = 6,
+      .samples = VK_SAMPLE_COUNT_1_BIT,
+      .tiling = VK_IMAGE_TILING_OPTIMAL,
+      .usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+      .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+      .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+  };
+
+  auto image = Image::mk(image_info, Image::Type::CubeMap);
+
+  vector<VkBufferImageCopy> regions;
+  regions.reserve(6 * mip);
+
+  for (uint32_t face = 0; face < 6; face++) {
+    u64 offset = size * face;
+
+    VkBufferImageCopy region = {
+        .bufferOffset = offset,
+        .imageExtent = {.width = width, .height = height, .depth = 1},
+    };
+    region.imageSubresource = {
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .mipLevel = 0,
+        .baseArrayLayer = face,
+        .layerCount = 1,
+    };
+    regions.push_back(region);
+  }
+
+  VkImageSubresourceRange subrange = {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .baseMipLevel = 0,
+      .levelCount = mip,
+      .layerCount = 6,
+  };
+
+  xofo::execute([&](auto cmd) {
+    set_image_layout(cmd, *image, ImageLayout::Undefined, ImageLayout::Dst,
+                     subrange);
+
+    vkCmdCopyBufferToImage(cmd, *staging, *image, ImageLayout::Dst,
+                           regions.size(), regions.data());
+
+    set_image_layout(cmd, *image, ImageLayout::Dst, ImageLayout::ShaderReadOnly,
+                     subrange, PipelineStage::Transfer,
+                     PipelineStage::FragmentShader);
+  });
+
+  return Box<Texture>((Texture*)image.release());
+}
+
+void bmap_copy_rect(u8* buffer, mango::Bitmap& img, vec2i lo, vec2i hi) {
+  u32 offset = img.stride * lo.y + lo.x * 4;
+  u32 strip = hi.x - lo.x;
+  for (u32 i = 0; i < hi.y - lo.y; ++i) {
+    memcpy(buffer, img.image + offset, strip * 4);
+    buffer += strip * 4;
+    offset += img.stride;
+  }
+}
+
+/*
+
+----||||--------
+||||||||||||||||
+----||||--------
+
+*/
+
+Box<Texture> xofo::load_cubemap_single_file(string file, VkFormat format) {
+  mango::Bitmap bitmap = file;
+
+  u32 width = bitmap.width / 4;
+  u32 height = bitmap.height / 3;
+
+  u32 mip = 1;
+  u64 size = width * height * 4;
+
+  auto staging = Buffer::mk(size * 6, Buffer::Src, Buffer::Mapped);
+
+  i32 posx = 0;
+  i32 negx = 1;
+  i32 posy = 2;
+  i32 negy = 3;
+  i32 posz = 5;
+  i32 negz = 4;
+  // posx - [2-3]/4 mid
+  bmap_copy_rect(staging->mapping + size * posx, bitmap,
+                 vec2i(width * 2, height * 1), vec2i(width * 3, height * 2));
+
+  // negx - [0-1]/4 mid
+  bmap_copy_rect(staging->mapping + size * negx, bitmap,
+                 vec2i(width * 0, height * 1), vec2i(width * 1, height * 2));
+
+  // posy - [1-2]/4 top
+  bmap_copy_rect(staging->mapping + size * posy, bitmap,
+                 vec2i(width * 1, height * 0), vec2i(width * 2, height * 1));
+
+  // negy - [1-2]/4 bot
+  bmap_copy_rect(staging->mapping + size * negy, bitmap,
+                 vec2i(width * 1, height * 2), vec2i(width * 2, height * 3));
+
+  // posz - [3-4]/4 mid
+  bmap_copy_rect(staging->mapping + size * posz, bitmap,
+                 vec2i(width * 3, height * 1), vec2i(width * 4, height * 2));
+
+  // negz - [1-2]/4 mid
+  bmap_copy_rect(staging->mapping + size * negz, bitmap,
+                 vec2i(width * 1, height * 1), vec2i(width * 2, height * 2));
 
   // Create optimal tiled target image
   VkImageCreateInfo image_info = {

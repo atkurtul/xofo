@@ -32,7 +32,7 @@ Box<Buffer> Buffer::mk(size_t size, VkBufferUsageFlags usage, Mapping map) {
                           
   return Box<Buffer>(new Buffer {
       .buffer = buffer,
-      .mapping = (char*)alloc_info.pMappedData,
+      .mapping = (u8*)alloc_info.pMappedData,
       .allocation = allocation,
   });
 }

@@ -1,7 +1,7 @@
 #ifndef B6EB7CB5_9227_4FBF_9721_005CAC0511AA
 #define B6EB7CB5_9227_4FBF_9721_005CAC0511AA
+
 #include "core.h"
-#include <vulkan/vulkan_core.h>
 
 namespace xofo {
 
@@ -10,6 +10,13 @@ struct Shader {
   VkShaderModule mod;
 
   operator VkShaderModule() const { return mod; }
+};
+
+struct StageInputs {
+  struct {
+    std::vector<VkVertexInputAttributeDescription> attr;
+    u32 stride;
+  } per_vertex, per_instance;
 };
 
 struct SetLayout {
@@ -39,28 +46,47 @@ struct Pipeline {
 
   std::vector<SetLayout> set_layouts;
   std::vector<VkDescriptorPool> pools;
-  std::vector<VkVertexInputAttributeDescription> attr;
+  StageInputs inputs;
 
-  u32 stride;
   Shader shaders[2];
 
   operator VkPipeline() { return pipeline; }
   operator VkPipelineLayout() { return layout; }
   void create();
   void recompile();
-  
+
   static Box<Pipeline> mk(std::string const& shader);
 
+  VkCullModeFlags culling = VK_CULL_MODE_NONE;
   VkPolygonMode mode = VK_POLYGON_MODE_FILL;
   VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
   bool depth_test = true;
   bool depth_write = true;
+  f32 line_width = 1;
 
   void reset();
 
+  void bind(VkCommandBuffer cmd = vk) {
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+  }
+
+  void bind_set(auto set, u32 idx = 0, VkCommandBuffer cmd = vk) {
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, idx, 1,
+                            &set, 0, 0);
+  }
+
+  template <class T>
+  void push(T&& data, u32 offset = 0, VkCommandBuffer cmd = vk) {
+    vkCmdPushConstants(cmd, layout, 17, offset, sizeof(T), &data);
+  }
 
   void set_mode(VkPolygonMode mode) {
     this->mode = mode;
+    reset();
+  }
+
+  void set_line_width(f32 width) {
+    line_width = width;
     reset();
   }
 
@@ -83,7 +109,8 @@ struct Pipeline {
 
   VkDescriptorSet alloc_set(u32 set);
   ~Pipeline();
-  private:
+
+ private:
   Pipeline(std::string const& shader);
 };
 

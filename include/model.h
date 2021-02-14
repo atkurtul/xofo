@@ -17,7 +17,7 @@ struct Model {
   f32 scale;
 
   Model(const char* path, Pipeline& pipeline) : scale(1), pos(0) {
-    MeshLoader mesh_loader(path, pipeline.stride);
+    MeshLoader mesh_loader(path, pipeline.inputs.per_vertex.stride);
     mesh_loader.tex = 12;
     mesh_loader.norm0 = 20;
     mesh_loader.norm1 = 32;
@@ -54,7 +54,7 @@ struct Model {
     });
   }
 
-  void draw(VkCommandBuffer cmd, VkPipelineLayout layout, mat mat) {
+  void draw(VkPipelineLayout layout, mat mat, VkCommandBuffer cmd = vk) {
     vkCmdPushConstants(cmd, layout, 17, 128, 64, &mat);
 
     for (auto& mesh : meshes) {

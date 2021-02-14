@@ -18,10 +18,15 @@ struct Buffer {
   };
 
   VkBuffer buffer;
-  char* mapping;
+  u8* mapping;
   VmaAllocation allocation;
 
   operator VkBuffer() const { return buffer; }
+
+  void bind_vertex(u64 offset = 0, u32 binding = 0, VkCommandBuffer cmd = vk) {
+    vkCmdBindVertexBuffers(cmd, binding, 1, &buffer, &offset);
+  }
+
 
   void copy(size_t len, void* pp, size_t offset = 0) {
     memcpy(mapping + offset, pp, len);
