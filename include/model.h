@@ -3,8 +3,8 @@
 
 #include "mesh_loader.h"
 
-#include <vulkan/vulkan_core.h>
 #include "buffer.h"
+
 #include "pipeline.h"
 
 namespace xofo {

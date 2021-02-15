@@ -1,9 +1,5 @@
-#include "image.h"
-#include <vulkan/vulkan_core.h>
 #include <xofo.h>
-#include <memory>
 
-#include <unordered_map>
 
 using namespace std;
 using namespace xofo;

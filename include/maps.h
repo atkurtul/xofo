@@ -1,6 +1,7 @@
 #ifndef A35B3A46_E1FF_4F3E_A823_A233A8C2305F
 #define A35B3A46_E1FF_4F3E_A823_A233A8C2305F
-#include <core.h>
+
+#include "core.h"
 
 template <class V>
 bool imgui_combo(const char* mode_name,

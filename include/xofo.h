@@ -1,21 +1,22 @@
 #ifndef AAC5BC72_0E32_4519_9DDB_1EA9F7F41521
 #define AAC5BC72_0E32_4519_9DDB_1EA9F7F41521
 
-#include <maps.h>
+#include "core.h"
 
-#include <buffer.h>
+#include "maps.h"
 
-#include <image.h>
+#include "buffer.h"
 
-#include <pipeline.h>
+#include "image.h"
 
-#include <mesh_loader.h>
+#include "pipeline.h"
 
-#include <model.h>
+#include "mesh_loader.h"
 
-#include <camera.h>
+#include "model.h"
 
+#include "camera.h"
 
-#include <cube_map.h>
+#include "cube_map.h"
 
 #endif /* AAC5BC72_0E32_4519_9DDB_1EA9F7F41521 */

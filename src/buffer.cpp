@@ -1,5 +1,4 @@
 #include <xofo.h>
-#include <memory>
 
 using namespace xofo;
 

@@ -1,10 +1,10 @@
 #ifndef CC7C02E2_3303_42F2_B2CE_B276CA93A3A6
 #define CC7C02E2_3303_42F2_B2CE_B276CA93A3A6
 
-#include <buffer.h>
-#include <image.h>
-#include <mesh_loader.h>
-#include <pipeline.h>
+#include "buffer.h"
+#include "image.h"
+#include "mesh_loader.h"
+#include "pipeline.h"
 
 namespace xofo {
 

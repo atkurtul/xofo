@@ -1,5 +1,3 @@
-#include "pipeline.h"
-#include <vulkan/vulkan_core.h>
 #include <xofo.h>
 
 #include <shaderc/shaderc.hpp>
@@ -26,7 +24,7 @@ static vector<u32> compile_glsl(const char* file, shaderc_shader_kind stage) {
     cerr << re.GetErrorMessage() << "\n";
     abort();
   }
-  cout << "Size is: " << re.end() - re.begin() << "\n";
+  //cout << "Size is: " << re.end() - re.begin() << "\n";
   return vector<u32>(re.begin(), re.end());
 }
 
@@ -103,8 +101,8 @@ static void build_set_layouts(
     if (bindings[set].size() < bind + 1) {
       bindings[set].resize(bind + 1);
     }
-    cout << set << ":" << bind << "\n";
-    cout << "\t" << desc_type_string(ty) << "\n";
+    // cout << set << ":" << bind << "\n";
+    // cout << "\t" << desc_type_string(ty) << "\n";
     auto& desc = bindings[set][bind];
     if (desc.descriptorCount != 0) {
       if (desc.descriptorType != ty) {
@@ -310,13 +308,13 @@ void Pipeline::create() {
     VertexInputState.vertexAttributeDescriptionCount = (u32)inputs.size();
     VertexInputState.pVertexAttributeDescriptions = inputs.data();
 
-    cout << "Input size: " << inputs.size() << "\n";
-    for (auto& input : inputs) {
-      cout << "\tlocation: " << input.location << "\n";
-      cout << "\tbinding: " << input.binding << "\n";
-      cout << "\tformat: " << input.format << "\n";
-      cout << "\toffset: " << input.offset << "\n--------------------\n";
-    }
+    // cout << "Input size: " << inputs.size() << "\n";
+    // for (auto& input : inputs) {
+    //   cout << "\tlocation: " << input.location << "\n";
+    //   cout << "\tbinding: " << input.binding << "\n";
+    //   cout << "\tformat: " << input.format << "\n";
+    //   cout << "\toffset: " << input.offset << "\n--------------------\n";
+    // }
   }
 
   VkPipelineInputAssemblyStateCreateInfo InputAssemblyState = {

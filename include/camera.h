@@ -1,7 +1,6 @@
 #ifndef B3B03750_263B_4E66_AC1D_8B942729270C
 #define B3B03750_263B_4E66_AC1D_8B942729270C
 
-#include <stdio.h>
 #include "typedefs.h"
 
 namespace xofo {

@@ -1,7 +1,7 @@
 #ifndef E7CD5CCF_D975_419F_81AE_1FAAB38BA0F3
 #define E7CD5CCF_D975_419F_81AE_1FAAB38BA0F3
 
-
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>

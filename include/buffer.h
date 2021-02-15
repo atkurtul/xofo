@@ -1,6 +1,6 @@
 #ifndef D8F23374_2F16_4692_A5AE_7D3369B8E620
 #define D8F23374_2F16_4692_A5AE_7D3369B8E620
-#include <vulkan/vulkan_core.h>
+
 #include "core.h"
 
 namespace xofo {

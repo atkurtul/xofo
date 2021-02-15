@@ -1,12 +1,5 @@
-
-#include <vulkan/vulkan_core.h>
-#include "core.h"
-#include "imgui.h"
 #define VMA_IMPLEMENTATION
-#include <vk_mem_alloc.h>
-
 #include <xofo.h>
-#include <memory>
 
 #include <GLFW/glfw3.h>
 

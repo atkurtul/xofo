@@ -1,11 +1,4 @@
-#include "buffer.h"
-#include <image.h>
 #include <xofo.h>
-#include <cstdio>
-#include <cstring>
-#include <mango/math/geometry.hpp>
-
-#include <mango/image/surface.hpp>
 
 using namespace std;
 using namespace xofo;

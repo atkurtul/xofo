@@ -1,13 +1,10 @@
+#include <xofo.h>
+
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 #include <assimp/types.h>
 #include <assimp/Importer.hpp>
 
-#include <mango/math/vector.hpp>
-#include <mesh_loader.h>
-
-#include <iostream>
-#include <unordered_map>
 
 using namespace std;
 using namespace xofo;

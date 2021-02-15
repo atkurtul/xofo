@@ -1,9 +1,9 @@
 #ifndef B6EB7CB5_9227_4FBF_9721_005CAC0511AA
 #define B6EB7CB5_9227_4FBF_9721_005CAC0511AA
 
-#include <core.h>
+#include "core.h"
 
-#include <maps.h>
+#include "maps.h"
 
 namespace xofo {
 

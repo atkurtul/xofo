@@ -6,7 +6,9 @@
 #include <mango/math/matrix_float4x4.hpp>
 #include <mango/math/math.hpp>
 #include <mango/math/quaternion.hpp>
+#include <mango/math/geometry.hpp>
 
+#include <mango/image/surface.hpp>
 
 #define RADIAN 0.01745329251f
 
