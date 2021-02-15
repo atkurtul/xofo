@@ -31,17 +31,17 @@ struct CubeMap {
       vkCmdCopyBuffer(cmd, *staging, *buffer, 1, &reg);
     });
 
-    texture = load_cubemap_single_file("models/Daylight.png",
-                                       VK_FORMAT_R8G8B8A8_SRGB);
+    texture = Texture::load_cubemap_single_file("models/Daylight.png",
+                                                VK_FORMAT_R8G8B8A8_SRGB);
+
     // set = pipeline.create_set(0, texture.get());
     // texture->bind_to_set(set, 0);
   };
 
   void draw(Pipeline& pipeline, mat mat, VkCommandBuffer cmd = vk) {
     pipeline.push(mat, 128);
-    auto set = pipeline.get_set([&](auto set) { texture->bind_to_set(set, 0); },
-                                0, texture.get());
-    pipeline.bind_set(set, 0);
+    pipeline.bind_set([&](auto set) { texture->bind_to_set(set, 0); },
+                      {texture.get()}, 0, cmd);
 
     buffer->bind_vertex();
     vkCmdBindIndexBuffer(cmd, *buffer, mesh.index_offset, VK_INDEX_TYPE_UINT32);
@@ -82,7 +82,6 @@ void show_pipeline_state(Pipeline& pipeline) {
       ImGui::DragFloat("Line width", &pipeline.state.line_width, 0.1, 0.1, 32) |
       ImGui::Checkbox("Depth test", &pipeline.state.depth_test) |
       ImGui::Checkbox("Depth write", &pipeline.state.depth_write)) {
-    cout << "Cull mode: " << pipeline.state.culling << "\n";
     pipeline.reset();
   }
   ImGui::End();
@@ -94,17 +93,39 @@ void show_mesh_state(Mesh const& mesh) {
   ImGui::Text("Material index %u", mesh.mat);
 }
 
-void show_model(Model const& model) {}
+void show_texture(const char* name, Texture const& tex) {
+  ImGui::Text("%10s: %25s", name, tex.origin.data());
+  ImGui::Text("Width: %4u Height: %4u", tex.width, tex.height);
+}
+
+void show_material(Material const& mat) {
+  show_texture("Diffuse", *mat.diffuse);
+  show_texture("Normal", *mat.normal);
+  show_texture("Metallic", *mat.metallic);
+}
+
+void show_model(Model const& model) {
+  ImGui::Begin(model.origin.data());
+  u32 idx = 0;
+  for (auto mesh : model.meshes) {
+    if (ImGui::TreeNode(("Mesh [" + to_string(idx++) + "]").data())) {
+      show_mesh_state(mesh);
+      // show_material(model.mats[mesh.mat]);
+    }
+  }
+
+  ImGui::End();
+}
 
 int main() {
   xofo::init();
   auto pipeline = Pipeline::mk("shaders/shader");
-  auto skybox = Pipeline::mk("shaders/skybox", {.depth_write = 0});
+  auto skybox = Pipeline::mk("shaders/skybox", PipelineState{.depth_write = 0});
 
   CubeMap cube_map(*skybox);
 
-  auto grid_pipe =
-      Pipeline::mk("shaders/grid", {.polygon = VK_POLYGON_MODE_LINE,
+  auto grid_pipe = Pipeline::mk(
+      "shaders/grid", PipelineState{.polygon = VK_POLYGON_MODE_LINE,
                                     .topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST,
                                     .line_width = 1.2f});
 
@@ -113,7 +134,7 @@ int main() {
 
   // Model model0("models/sponza/sponza.gltf", *pipeline);
 
-  // Model model1("models/doom/0.obj", *pipeline);
+  Model model1("models/doom/0.obj", *pipeline);
   // Model model2("models/batman/0.obj", *pipeline);
   // Model model3("models/heavy_assault_rifle/scene.gltf", *pipeline);
   // model0.scale = 0.1;
@@ -160,15 +181,6 @@ int main() {
 
     uniform->copy(cam.pos);
 
-    auto inv_view = mango::inverse(cam.view);
-    if (get_key(Key::E) | 1) {
-      auto xf = mat(1);
-      xf.translate(xxf + vec3(0.1, -0.2, -0.4));
-      auto xx = mango::AngleAxis(-180 * RADIAN, vec3(0, 1, 1)) *
-                mango::AngleAxis(ax.w, ax.xyz);
-      m3 = mat(0.015) * xx * xf * inv_view;
-    }
-
     xofo::draw(
         [&](auto) {
           skybox->bind();
@@ -180,15 +192,11 @@ int main() {
           cube_map.draw(*skybox, id);
 
           pipeline->bind();
+          pipeline->bind_set([&](auto set) { uniform->bind_to_set(set, 0); },
+                             {uniform.get()});
 
-          auto cam_set =
-              pipeline->get_set([&](auto set) { uniform->bind_to_set(set, 0); },
-                                0, uniform.get());
-          pipeline->bind_set(cam_set, 0);
-          model0.draw(*pipeline, mat(1));
-          // model1.draw(cmd, *pipeline, mat(1));
-          // model2.draw(cmd, *pipeline, mat(1));
-          // model3.draw(cmd, *pipeline, m3);
+          // model0.draw(*pipeline, mat(1));
+          model1.draw(*pipeline, mat(1));
 
           grid_pipe->bind();
           grid_buffer->bind_vertex();
@@ -196,28 +204,6 @@ int main() {
         },
         [&]() {
           using namespace ImGui;
-          static bool show_pipeline = false;
-          if (show_pipeline && Begin("Create pipeline", &show_pipeline)) {
-            if (Button("Create")) {
-              show_pipeline = false;
-            }
-            static u32 cull = 0;
-            static u32 polygon = 0;
-            static u32 topology = 0;
-            static f32 line_width = 1.f;
-            static bool depth_test = true;
-            static bool depth_write = true;
-            static char shader_path[256] = {};
-            imgui_combo("Cull mode", CullModeFlagBits_map, cull);
-            imgui_combo("Polygon mode", PolygonMode_map, polygon);
-            imgui_combo("Topology", PrimitiveTopology_map, topology);
-            DragFloat("Line width", &line_width, 0.1, 0.1, 32);
-            Checkbox("Depth test", &depth_test);
-            Checkbox("Depth write", &depth_write);
-            InputText("Shader path", shader_path, 256);
-            End();
-          }
-
           BeginMainMenuBar();
           {
             if (BeginMenu("File")) {
@@ -225,13 +211,6 @@ int main() {
               ShowExampleMenuFile();
               EndMenu();
             }
-            if (BeginMenu("New")) {
-              if (MenuItem("Pipeline")) {
-                show_pipeline = true;
-              }
-              EndMenu();
-            }
-            EndMenuBar();
           }
 
           for (auto pipe : Pipeline::pipelines) {

@@ -3,6 +3,7 @@
 #include <assimp/types.h>
 #include <assimp/Importer.hpp>
 
+#include <mango/math/vector.hpp>
 #include <mesh_loader.h>
 
 #include <iostream>
@@ -53,11 +54,17 @@ std::vector<Mesh> MeshLoader::import(u32 flags) {
   return meshes;
 }
 
-void MeshLoader::load_geometry(u8* buffer) {
+Bbox MeshLoader::load_geometry(u8* buffer) {
+  Bbox box = { };
+
   for (u32 i = 0; i < scene->mNumMeshes; ++i) {
     struct aiMesh* mesh = scene->mMeshes[i];
     for (u32 j = 0; j < mesh->mNumVertices; ++j) {
+
       memcpy(buffer, mesh->mVertices + j, 12);
+      vec3 pos = *(vec3*)(mesh->mVertices + j);
+      box.min = mango::min(pos, box.min);
+      box.max = mango::max(pos, box.max);
 
       if (tex && mesh->mTextureCoords[0])
         memcpy(buffer + tex, &mesh->mTextureCoords[0][j], 8);
@@ -84,7 +91,9 @@ void MeshLoader::load_geometry(u8* buffer) {
       buffer += 12;
     }
   }
+  return box;
 }
+
 std::vector<Material> MeshLoader::load_materials() {
   unordered_map<string, Rc<Texture>> textures;
   std::vector<Material> mats;

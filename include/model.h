@@ -12,10 +12,10 @@ struct Model {
   std::string origin;
   std::vector<Mesh> meshes;
   std::vector<Material> mats;
-  // std::vector<VkDescriptorSet> sets;
   Rc<Buffer> buffer;
   vec3 pos;
   f32 scale;
+  Bbox box;
 
   Model(const char* path, Pipeline& pipeline) : origin(path), scale(1), pos(0) {
     MeshLoader mesh_loader(path, pipeline.inputs.per_vertex.stride);
@@ -30,7 +30,7 @@ struct Model {
 
     auto staging = Buffer::mk(mesh_loader.size, Buffer::Src, Buffer::Mapped);
     mats = mesh_loader.load_materials();
-    mesh_loader.load_geometry(staging->mapping);
+    box = mesh_loader.load_geometry(staging->mapping);
 
     xofo::execute([&](auto cmd) {
       VkBufferCopy reg = {0, 0, mesh_loader.size};
@@ -40,10 +40,9 @@ struct Model {
 
   void draw(Pipeline& pipeline, mat mat, VkCommandBuffer cmd = vk) {
     pipeline.push(mat, 128);
-
     for (auto& mesh : meshes) {
       for (auto& mat : mats) {
-        auto set = pipeline.get_set(
+        pipeline.bind_set(
             [&](auto set) {
               switch (pipeline.set_layouts[1].bindings.size()) {
                 default:
@@ -56,13 +55,11 @@ struct Model {
                 case 0:;
               }
             },
-            1, mat.metallic.get(), mat.normal.get(), mat.diffuse.get());
-        pipeline.bind_set(set, 1);
+            {mat.metallic.get(), mat.normal.get(), mat.diffuse.get()}, 1, cmd);
       }
-      vkCmdBindVertexBuffers(cmd, 0, 1, &buffer->buffer, &mesh.vertex_offset);
-      vkCmdBindIndexBuffer(cmd, *buffer, mesh.index_offset,
-                           VK_INDEX_TYPE_UINT32);
-      vkCmdDrawIndexed(cmd, mesh.indices / 4, 1, 0, 0, 0);
+      buffer->bind_vertex(mesh.vertex_offset);
+      buffer->bind_index(mesh.index_offset);
+      vkCmdDrawIndexed(cmd, mesh.indices >> 2, 1, 0, 0, 0);
     }
   }
 };

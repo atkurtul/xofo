@@ -361,7 +361,7 @@ u8* blur(mango::Bitmap& bmap) {
   return re;
 }
 
-Box<Texture> xofo::Texture::mk(void* data,
+Box<Texture> xofo::Texture::mk(std::string tag, void* data,
                                VkFormat format,
                                u32 width,
                                u32 height) {
@@ -371,20 +371,18 @@ Box<Texture> xofo::Texture::mk(void* data,
 
   u32 mip = (u32)floor(log2(width > height ? width : height)) + 1;
 
-  auto image = Box<Texture>(
-      (Texture*)Image::mk(format, Image::Src | Image::Dst | Image::Sampled,
-                          extent, mip)
-          .release());
-
+  auto texture = Box<Texture>(new Texture(format, Image::Src | Image::Dst | Image::Sampled,
+                                  extent, mip));
+  texture->origin = move(tag);
   auto src = Buffer::mk(size, Buffer::Src, Buffer::Mapped);
   memcpy(src->mapping, data, size);
 
   xofo::execute([&](auto cmd) {
-    copy_texture(cmd, *src, *image, extent);
-    generate_mips(cmd, mip, *image, extent);
+    copy_texture(cmd, *src, *texture, extent);
+    generate_mips(cmd, mip, *texture, extent);
   });
 
-  return image;
+  return texture;
 }
 
 Box<Texture> Texture::mk(string file, VkFormat format) {
@@ -394,7 +392,7 @@ Box<Texture> Texture::mk(string file, VkFormat format) {
                                            mango::Format::RGBA, 8, 8, 8, 8));
 
   // auto* data = blur(bitmap);
-  return Texture::mk(bitmap.image, format, bitmap.width, bitmap.height);
+  return Texture::mk(move(file), bitmap.image, format, bitmap.width, bitmap.height);
 }
 
 using namespace xofo;
@@ -447,7 +445,7 @@ vector<u64> sub_vec(vector<u64> const& a, vector<u64> const& b) {
   return re;
 }
 
-Box<Texture> xofo::load_cubemap_ktx(string file, VkFormat format) {
+Box<Texture> Texture::load_cubemap_ktx(string file, VkFormat format) {
   ktxTexture* tex;
   ktxResult result = ktxTexture_CreateFromNamedFile(
       file.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &tex);
@@ -484,7 +482,7 @@ Box<Texture> xofo::load_cubemap_ktx(string file, VkFormat format) {
       .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
   };
 
-  auto image = Image::mk(image_info, Image::Type::CubeMap);
+  auto texture = new Texture(image_info, Image::Type::CubeMap);
 
   vector<VkBufferImageCopy> regions;
   regions.reserve(6 * mip);
@@ -524,21 +522,21 @@ Box<Texture> xofo::load_cubemap_ktx(string file, VkFormat format) {
   };
 
   xofo::execute([&](auto cmd) {
-    set_image_layout(cmd, *image, ImageLayout::Undefined, ImageLayout::Dst,
+    set_image_layout(cmd, *texture, ImageLayout::Undefined, ImageLayout::Dst,
                      subrange);
 
-    vkCmdCopyBufferToImage(cmd, *staging, *image, ImageLayout::Dst,
+    vkCmdCopyBufferToImage(cmd, *staging, *texture, ImageLayout::Dst,
                            regions.size(), regions.data());
 
-    set_image_layout(cmd, *image, ImageLayout::Dst, ImageLayout::ShaderReadOnly,
+    set_image_layout(cmd, *texture, ImageLayout::Dst, ImageLayout::ShaderReadOnly,
                      subrange, PipelineStage::Transfer,
                      PipelineStage::FragmentShader);
   });
 
-  return Box<Texture>((Texture*)image.release());
+  return Box<Texture>(texture);
 }
 
-Box<Texture> xofo::load_cubemap_6_files_from_folder(string folder, VkFormat format) {
+Box<Texture> Texture::load_cubemap_6_files_from_folder(string folder, VkFormat format) {
   mango::Bitmap bitmaps[6] = {folder + "/posx.jpg", folder + "/negx.jpg",
                               folder + "/posy.jpg", folder + "/negy.jpg",
                               folder + "/posz.jpg", folder + "/negz.jpg"};
@@ -572,7 +570,7 @@ Box<Texture> xofo::load_cubemap_6_files_from_folder(string folder, VkFormat form
       .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
   };
 
-  auto image = Image::mk(image_info, Image::Type::CubeMap);
+  auto texture = new Texture(image_info, Image::Type::CubeMap);
 
   vector<VkBufferImageCopy> regions;
   regions.reserve(6 * mip);
@@ -601,18 +599,18 @@ Box<Texture> xofo::load_cubemap_6_files_from_folder(string folder, VkFormat form
   };
 
   xofo::execute([&](auto cmd) {
-    set_image_layout(cmd, *image, ImageLayout::Undefined, ImageLayout::Dst,
+    set_image_layout(cmd, *texture, ImageLayout::Undefined, ImageLayout::Dst,
                      subrange);
 
-    vkCmdCopyBufferToImage(cmd, *staging, *image, ImageLayout::Dst,
+    vkCmdCopyBufferToImage(cmd, *staging, *texture, ImageLayout::Dst,
                            regions.size(), regions.data());
 
-    set_image_layout(cmd, *image, ImageLayout::Dst, ImageLayout::ShaderReadOnly,
+    set_image_layout(cmd, *texture, ImageLayout::Dst, ImageLayout::ShaderReadOnly,
                      subrange, PipelineStage::Transfer,
                      PipelineStage::FragmentShader);
   });
 
-  return Box<Texture>((Texture*)image.release());
+  return Box<Texture>(texture);
 }
 
 void bmap_copy_rect(u8* buffer, mango::Bitmap& img, vec2i lo, vec2i hi) {
@@ -633,7 +631,7 @@ void bmap_copy_rect(u8* buffer, mango::Bitmap& img, vec2i lo, vec2i hi) {
 
 */
 
-Box<Texture> xofo::load_cubemap_single_file(string file, VkFormat format) {
+Box<Texture> Texture::load_cubemap_single_file(string file, VkFormat format) {
   mango::Bitmap bitmap = file;
 
   u32 width = bitmap.width / 4;
@@ -692,7 +690,7 @@ Box<Texture> xofo::load_cubemap_single_file(string file, VkFormat format) {
       .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
   };
 
-  auto image = Image::mk(image_info, Image::Type::CubeMap);
+  auto texture = new Texture(image_info, Image::Type::CubeMap);
 
   vector<VkBufferImageCopy> regions;
   regions.reserve(6 * mip);
@@ -721,16 +719,16 @@ Box<Texture> xofo::load_cubemap_single_file(string file, VkFormat format) {
   };
 
   xofo::execute([&](auto cmd) {
-    set_image_layout(cmd, *image, ImageLayout::Undefined, ImageLayout::Dst,
+    set_image_layout(cmd, *texture, ImageLayout::Undefined, ImageLayout::Dst,
                      subrange);
 
-    vkCmdCopyBufferToImage(cmd, *staging, *image, ImageLayout::Dst,
+    vkCmdCopyBufferToImage(cmd, *staging, *texture, ImageLayout::Dst,
                            regions.size(), regions.data());
 
-    set_image_layout(cmd, *image, ImageLayout::Dst, ImageLayout::ShaderReadOnly,
+    set_image_layout(cmd, *texture, ImageLayout::Dst, ImageLayout::ShaderReadOnly,
                      subrange, PipelineStage::Transfer,
                      PipelineStage::FragmentShader);
   });
 
-  return Box<Texture>((Texture*)image.release());
+  return Box<Texture>(texture);
 }

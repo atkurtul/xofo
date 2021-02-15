@@ -1,9 +1,10 @@
 #ifndef D8F23374_2F16_4692_A5AE_7D3369B8E620
 #define D8F23374_2F16_4692_A5AE_7D3369B8E620
 #include "core.h"
+#include <vulkan/vulkan_core.h>
 
 namespace xofo {
-struct Buffer {
+struct Buffer : ShaderResource {
   enum {
     Src = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
     Dst = VK_BUFFER_USAGE_TRANSFER_DST_BIT,
@@ -27,6 +28,9 @@ struct Buffer {
     vkCmdBindVertexBuffers(cmd, binding, 1, &buffer, &offset);
   }
 
+  void bind_index(u64 offset = 0, VkCommandBuffer cmd = vk) {
+    vkCmdBindIndexBuffer(cmd, buffer, offset, VK_INDEX_TYPE_UINT32);
+  }
 
   void copy(size_t len, void* pp, size_t offset = 0) {
     memcpy(mapping + offset, pp, len);

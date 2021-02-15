@@ -3,13 +3,14 @@
 #include "core.h"
 
 namespace xofo {
-struct Image {
+struct Image : ShaderResource {
   VmaAllocation allocation;
   VkImage image;
   VkImageView view;
   VkSampler sampler;
   VkDescriptorType type;
   VkImageLayout layout;
+  u32 width, height;
   enum {
     Src = VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
     Dst = VK_IMAGE_USAGE_TRANSFER_DST_BIT,
@@ -46,17 +47,33 @@ struct Image {
   ~Image();
 
   VkDescriptorSet bind_to_set(VkDescriptorSet set, u32 bind);
+
+  protected:
+  Image(VkImageCreateInfo const& info, Type ty = Type::Standard);
+  Image(VkFormat format,
+                       VkImageUsageFlags usage,
+                       VkExtent2D extent,
+                       u32 mip,
+                       Type ty = Type::Standard,
+                       VkSampleCountFlagBits ms = VK_SAMPLE_COUNT_1_BIT);
 };
 
 struct Texture : Image  {
   static std::vector<Texture*> textures;
+  std::string origin;
   static Box<Texture> mk(std::string file, VkFormat format);
-  static Box<Texture> mk(void* data, VkFormat format, u32 width, u32 height);
+  static Box<Texture> mk(std::string tag, void* data, VkFormat format, u32 width, u32 height);
+
+
+  static Box<Texture> load_cubemap_ktx(std::string file, VkFormat format);
+  static Box<Texture> load_cubemap_6_files_from_folder(std::string folder, VkFormat format);
+  static Box<Texture> load_cubemap_single_file(std::string folder, VkFormat format);
+
+  private:
+  using Image::Image;
 };
 
-Box<Texture> load_cubemap_ktx(std::string file, VkFormat format);
-Box<Texture> load_cubemap_6_files_from_folder(std::string folder, VkFormat format) ;
-Box<Texture> load_cubemap_single_file(std::string folder, VkFormat format) ;
+
 }  // namespace xofo
 
 

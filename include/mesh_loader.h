@@ -20,7 +20,7 @@ struct MeshLoader {
 
   std::vector<xofo::Material> load_materials();
 
-  void load_geometry(u8* buffer);
+  xofo::Bbox load_geometry(u8* buffer);
 
   ~MeshLoader();
 };

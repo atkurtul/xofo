@@ -3,9 +3,16 @@
 
 #include "image.h"
 #include "pipeline.h"
+#include <cmath>
 
 
 namespace xofo {
+
+
+struct Bbox {
+  vec3 min = vec3(-INFINITY);
+  vec3 max = vec3(+INFINITY);
+};
 
 struct Mesh {
   u64 vertex_offset;
@@ -25,9 +32,9 @@ struct Material {
     u8 black[4] = {0, 0, 0, 255};
     u8 blue[4] = {0, 0, 255, 255};
     u8 white[4] = {255, 255, 255, 255};
-    static auto diffuse  =  Rc<Texture>(Texture::mk(white, VK_FORMAT_R8G8B8A8_SRGB, 1, 1));
-    static auto normal   =  Rc<Texture>(Texture::mk(blue, VK_FORMAT_R8G8B8A8_SRGB, 1, 1));
-    static auto metallic =  Rc<Texture>(Texture::mk(black, VK_FORMAT_R8G8B8A8_SRGB, 1, 1));
+    static auto diffuse  =  Rc<Texture>(Texture::mk("default diffuse", white, VK_FORMAT_R8G8B8A8_SRGB, 1, 1));
+    static auto normal   =  Rc<Texture>(Texture::mk("default normal", blue, VK_FORMAT_R8G8B8A8_SRGB, 1, 1));
+    static auto metallic =  Rc<Texture>(Texture::mk("default metallic", black, VK_FORMAT_R8G8B8A8_SRGB, 1, 1));
     xofo::at_exit([]() {
       diffuse.reset();
       normal.reset();
@@ -38,9 +45,6 @@ struct Material {
     this->metallic = metallic;
   }
 
-  void bind(Pipeline& pipe, VkCommandBuffer cmd = vk) {
-    
-  }
 };
 
 

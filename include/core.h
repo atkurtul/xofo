@@ -38,6 +38,10 @@ const char* desc_type_string(VkDescriptorType ty);
 namespace xofo {
 enum class Key;
 
+struct ShaderResource {
+
+};
+
 void init();
 
 void at_exit(std::function<void()> const& f);

@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <type_traits>
+#include <vulkan/vulkan_core.h>
 #include "core.h"
 
 namespace xofo {
@@ -51,7 +52,7 @@ struct PipelineState {
 
 
 struct vector_hasher {
-  u64 operator()(std::vector<void*> const& v) const {
+  u64 operator()(std::vector<ShaderResource*> const& v) const {
     u64 hash = v.size();
     for (auto& i : v)
       hash ^= (u64)i + 0x9e3779b9 + (hash << 6) + (hash >> 2);
@@ -67,7 +68,7 @@ struct Pipeline {
 
   std::vector<SetLayout> set_layouts;
   std::vector<VkDescriptorPool> pools;
-  std::unordered_map<std::vector<void*>, VkDescriptorSet, vector_hasher> sets;
+  std::unordered_map<std::vector<ShaderResource*>, VkDescriptorSet, vector_hasher> sets;
 
   StageInputs inputs;
 
@@ -89,11 +90,6 @@ struct Pipeline {
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
   }
 
-  void bind_set(auto set, u32 idx = 0, VkCommandBuffer cmd = vk) {
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, idx,
-                            1, &set, 0, 0);
-  }
-
   template <class T>
   void push(T&& data, u32 offset = 0, VkCommandBuffer cmd = vk) {
     vkCmdPushConstants(cmd, layout, 17, offset, sizeof(T), &data);
@@ -104,19 +100,21 @@ struct Pipeline {
     reset();
   }
 
-  template<class...Resources> requires(std::is_convertible<Resources, void*>::value && ...)
-  VkDescriptorSet get_set(std::function<void(VkDescriptorSet)> const& write_set, u32 n, Resources... res) {
-    auto& set = sets[{(void*)res...}];
+  VkDescriptorSet bind_set(std::function<void(VkDescriptorSet)> const& write_set, std::vector<ShaderResource*> const& res, u32 idx = 0, VkCommandBuffer cmd = vk) {
+    auto& set = sets[res];
     if (!set) {
       VkDescriptorSetAllocateInfo info = {
           .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-          .descriptorPool = pools.at(n),
+          .descriptorPool = pools.at(idx),
           .descriptorSetCount = 1,
-          .pSetLayouts = &set_layouts.at(n).layout,
+          .pSetLayouts = &set_layouts.at(idx).layout,
       };
       CHECKRE(vkAllocateDescriptorSets(vk, &info, &set));
       write_set(set);
     }
+
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, idx,
+                          1, &set, 0, 0);
     return set;
   }
 

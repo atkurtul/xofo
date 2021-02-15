@@ -35,14 +35,14 @@ void Image::type_layout(VkImageUsageFlags usage,
       break;
   }
 }
-Box<Image> Image::mk(VkImageCreateInfo const& info, Type type) {
-  VkImage image;
-  VmaAllocation allocation;
-  VkDescriptorType descriptor_type;
-  VkImageLayout layout;
-  VkImageView view;
-  VkSampler sampler;
 
+Box<Image> Image::mk(VkImageCreateInfo const& info, Type type) {
+  return Box<Image>(new Image(info, type));
+}
+
+Image::Image(VkImageCreateInfo const& info, Type type) {
+  width = info.extent.width;
+  height = info.extent.height;
   VmaAllocationCreateInfo allocation_info = {.usage =
                                                  VMA_MEMORY_USAGE_GPU_ONLY};
   VmaAllocationInfo out_info;
@@ -55,7 +55,7 @@ Box<Image> Image::mk(VkImageCreateInfo const& info, Type type) {
       .levelCount = info.mipLevels,
       .layerCount = 1,
   };
-  
+
   auto view_type = VK_IMAGE_VIEW_TYPE_2D;
   switch (type) {
     case Type::DepthBuffer:
@@ -82,19 +82,34 @@ Box<Image> Image::mk(VkImageCreateInfo const& info, Type type) {
 
   CHECKRE(vkCreateImageView(vk, &view_info, 0, &view));
 
-  type_layout(info.usage, descriptor_type, layout);
+  type_layout(info.usage, this->type, layout);
 
   sampler = create_sampler(VK_SAMPLER_ADDRESS_MODE_REPEAT, info.mipLevels);
-
-  return Box<Image>(new Image{
-      .allocation = allocation,
-      .image = image,
-      .view = view,
-      .sampler = sampler,
-      .type = descriptor_type,
-      .layout = layout,
-  });
 }
+
+
+Image::Image(VkFormat format,
+             VkImageUsageFlags usage,
+             VkExtent2D extent,
+             u32 mip,
+             Type type,
+             VkSampleCountFlagBits ms)
+    : Image(
+          VkImageCreateInfo{
+              .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+              .imageType = VK_IMAGE_TYPE_2D,
+              .format = format,
+              .extent = {.width = extent.width,
+                         .height = extent.height,
+                         .depth = 1},
+              .mipLevels = mip,
+              .arrayLayers = 1,
+              .samples = ms,
+              .tiling = VK_IMAGE_TILING_OPTIMAL,
+              .usage = usage,
+              .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+          },
+          type) {}
 
 Box<Image> Image::mk(VkFormat format,
                      VkImageUsageFlags usage,
@@ -102,7 +117,6 @@ Box<Image> Image::mk(VkFormat format,
                      u32 mip,
                      Type type,
                      VkSampleCountFlagBits ms) {
-
   VkImageCreateInfo info = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
       .imageType = VK_IMAGE_TYPE_2D,
