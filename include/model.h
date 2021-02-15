@@ -5,6 +5,7 @@
 
 #include "buffer.h"
 #include "pipeline.h"
+#include <vulkan/vulkan_core.h>
 
 namespace xofo {
 
@@ -12,6 +13,8 @@ struct Model {
   std::string origin;
   std::vector<Mesh> meshes;
   std::vector<Material> mats;
+  std::vector<VkDescriptorSet> sets;
+
   Rc<Buffer> buffer;
   vec3 pos;
   f32 scale;
@@ -41,18 +44,17 @@ struct Model {
   void draw(Pipeline& pipeline, mat mat, VkCommandBuffer cmd = vk) {
     pipeline.push(mat, 128);
     for (auto& mesh : meshes) {
-      for (auto& mat : mats) {
         pipeline.bind_set(
             [&](auto set) {
               if (pipeline.has_binding(1, 2))
-                mat.metallic->bind_to_set(set, 2);
+                mats[mesh.mat].metallic->bind_to_set(set, 2);
               if (pipeline.has_binding(1, 1))
-                mat.normal->bind_to_set(set, 1);
-              //if (pipeline.has_binding(1, 0))
-              mat.diffuse->bind_to_set(set, 0);
+                mats[mesh.mat].normal->bind_to_set(set, 1);
+              if (pipeline.has_binding(1, 0))
+                mats[mesh.mat].diffuse->bind_to_set(set, 0);
             },
-            {mat.metallic.get(), mat.normal.get(), mat.diffuse.get()}, 1, cmd);
-      }
+            {mats[mesh.mat].metallic.get(), mats[mesh.mat].normal.get(), mats[mesh.mat].diffuse.get()}, 1, cmd);
+
       buffer->bind_vertex(mesh.vertex_offset);
       buffer->bind_index(mesh.index_offset);
       vkCmdDrawIndexed(cmd, mesh.indices >> 2, 1, 0, 0, 0);

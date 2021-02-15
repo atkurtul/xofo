@@ -117,32 +117,40 @@ struct Pipeline {
   }
 
   bool has_binding(u32 set, u32 idx, VkDescriptorType* out = 0) {
-      if (set_layouts.size() <= set) {
-        return false;
-      }
-      return set_layouts[set].has_binding(idx, out);
+    if (set_layouts.size() <= set) {
+      return false;
+    }
+    return set_layouts[set].has_binding(idx, out);
   }
 
-  VkDescriptorSet bind_set(
-      std::function<void(VkDescriptorSet)> const& write_set,
-      std::vector<ShaderResource*> const& res,
-      u32 idx = 0,
-      VkCommandBuffer cmd = vk) {
-    auto& set = sets[res];
-    if (!set) {
-      VkDescriptorSetAllocateInfo info = {
-          .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-          .descriptorPool = pools.at(idx),
-          .descriptorSetCount = 1,
-          .pSetLayouts = &set_layouts.at(idx).layout,
-      };
-      CHECKRE(vkAllocateDescriptorSets(vk, &info, &set));
-      write_set(set);
-    }
+  VkDescriptorSet allocate_set(u32 idx) {
+    VkDescriptorSet set;
+    VkDescriptorSetAllocateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .descriptorPool = pools.at(idx),
+        .descriptorSetCount = 1,
+        .pSetLayouts = &set_layouts.at(idx).layout,
+    };
+    CHECKRE(vkAllocateDescriptorSets(vk, &info, &set));
+    return set;
+  }
 
+  void bind_set0(VkDescriptorSet set, u32 idx = 0, VkCommandBuffer cmd = vk) {
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, idx,
                             1, &set, 0, 0);
-    return set;
+  }
+  
+  void bind_set(std::function<void(VkDescriptorSet)> const& write_set,
+                std::vector<ShaderResource*> const& res,
+                u32 idx = 0,
+                VkCommandBuffer cmd = vk) {
+    auto& set = sets[res];
+    if (!set) {
+      set = allocate_set(idx);
+      write_set(set);
+    }
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, idx,
+                            1, &set, 0, 0);
   }
 
   ~Pipeline();
