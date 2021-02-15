@@ -97,6 +97,11 @@ struct Texture : Image {
     return Image::bind_to_set(set, bind);
   }
 
+  void show(const char* name) {
+    ImGui::Text("%s: %s", name, origin.data());
+    ImGui::Text("Width: %4u Height: %4u", width, height);
+  }
+
  private:
   using Image::Image;
 };

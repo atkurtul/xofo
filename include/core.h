@@ -1,20 +1,24 @@
 #ifndef E7CD5CCF_D975_419F_81AE_1FAAB38BA0F3
 #define E7CD5CCF_D975_419F_81AE_1FAAB38BA0F3
 
-#include <vulkan/vulkan_core.h>
+
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <functional>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <string>
-#include <vector>
-#include <map>
-#include <fstream>
+#include <type_traits>
 #include <unordered_map>
+#include <vector>
 
 #include "typedefs.h"
 #include "vk_mem_alloc.h"
+
+#include <imgui.h>
+#include <imgui_internal.h>
 
 template <class T>
 using Box = std::unique_ptr<T>;
@@ -33,14 +37,12 @@ const char* desc_type_string(VkDescriptorType ty);
     }                                                                          \
   }
 
-#define ARRSIZE(arr) (sizeof(arr)/sizeof(arr[0]))
+#define ARRSIZE(arr) (sizeof(arr) / sizeof(arr[0]))
 
 namespace xofo {
 enum class Key;
 
-struct ShaderResource {
-
-};
+struct ShaderResource {};
 
 void init();
 

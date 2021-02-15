@@ -1,11 +1,9 @@
 #ifndef B6EB7CB5_9227_4FBF_9721_005CAC0511AA
 #define B6EB7CB5_9227_4FBF_9721_005CAC0511AA
 
-#include <vulkan/vulkan_core.h>
-#include <functional>
-#include <type_traits>
-#include <unordered_map>
-#include "core.h"
+#include <core.h>
+
+#include <maps.h>
 
 namespace xofo {
 
@@ -147,6 +145,23 @@ struct Pipeline {
     }
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, idx,
                             1, &set, 0, 0);
+  }
+
+
+  void show() {
+    ImGui::Begin(shader.data());
+    if (imgui_combo("Cull mode", CullModeFlagBits_map,
+                    (u32&)state.culling) |
+        imgui_combo("Polygon mode", PolygonMode_map,
+                    (u32&)state.polygon) |
+        imgui_combo("Topology", PrimitiveTopology_map,
+                    (u32&)state.topology) |
+        ImGui::DragFloat("Line width", &state.line_width, 0.1, 0.1, 32) |
+        ImGui::Checkbox("Depth test", &state.depth_test) |
+        ImGui::Checkbox("Depth write", &state.depth_write)) {
+      reset();
+    }
+    ImGui::End();
   }
 
   ~Pipeline();

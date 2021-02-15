@@ -15,9 +15,6 @@
 
 #include <camera.h>
 
-#include <imgui.h>
-
-#include <imgui_internal.h>
 
 #include <cube_map.h>
 

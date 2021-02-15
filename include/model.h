@@ -62,6 +62,19 @@ struct Model {
       vkCmdDrawIndexed(cmd, mesh.indices >> 2, 1, 0, 0, 0);
     }
   }
+
+  void show() {
+    ImGui::Begin(origin.data());
+    u32 idx = 0;
+    for (auto mesh : meshes) {
+      if (ImGui::TreeNode(("Mesh [" + std::to_string(idx++) + "]").data())) {
+        mesh.show();
+        mats[mesh.mat].show();
+        ImGui::TreePop();
+      }
+    }
+    ImGui::End();
+  }
 };
 
 }  // namespace xofo
