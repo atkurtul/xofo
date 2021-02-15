@@ -45,9 +45,9 @@ void main() {
   vec3 norm = texture(normal, tex).rgb * 2 - 1;
   norm = normalize(norm_mat * norm +  cam.pos.xyz+ metal) *0.0000001;
   out_color = vec4(col, 1);
-  if (length(norm) > 100000) {
-     out_color = vec4(1);
-  }
+  // if (length(norm) > 100000) {
+  //    out_color = vec4(1);
+  // }
 }
 
 void main1() {
