@@ -156,7 +156,7 @@ struct Pipeline {
                     (u32&)state.polygon) |
         imgui_combo("Topology", PrimitiveTopology_map,
                     (u32&)state.topology) |
-        ImGui::DragFloat("Line width", &state.line_width, 0.1, 0.1, 32) |
+        ImGui::DragFloat("Line width", &state.line_width, 0.1, 0.1, 64) |
         ImGui::Checkbox("Depth test", &state.depth_test) |
         ImGui::Checkbox("Depth write", &state.depth_write)) {
       reset();
