@@ -135,11 +135,7 @@ struct Pipeline {
     return set;
   }
 
-  void bind_set0(VkDescriptorSet set, u32 idx = 0, VkCommandBuffer cmd = vk) {
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, idx,
-                            1, &set, 0, 0);
-  }
-  
+
   void bind_set(std::function<void(VkDescriptorSet)> const& write_set,
                 std::vector<ShaderResource*> const& res,
                 u32 idx = 0,

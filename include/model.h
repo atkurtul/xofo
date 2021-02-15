@@ -3,9 +3,9 @@
 
 #include "mesh_loader.h"
 
+#include <vulkan/vulkan_core.h>
 #include "buffer.h"
 #include "pipeline.h"
-#include <vulkan/vulkan_core.h>
 
 namespace xofo {
 
@@ -44,16 +44,18 @@ struct Model {
   void draw(Pipeline& pipeline, mat mat, VkCommandBuffer cmd = vk) {
     pipeline.push(mat, 128);
     for (auto& mesh : meshes) {
-        pipeline.bind_set(
-            [&](auto set) {
-              if (pipeline.has_binding(1, 2))
-                mats[mesh.mat].metallic->bind_to_set(set, 2);
-              if (pipeline.has_binding(1, 1))
-                mats[mesh.mat].normal->bind_to_set(set, 1);
-              if (pipeline.has_binding(1, 0))
-                mats[mesh.mat].diffuse->bind_to_set(set, 0);
-            },
-            {mats[mesh.mat].metallic.get(), mats[mesh.mat].normal.get(), mats[mesh.mat].diffuse.get()}, 1, cmd);
+      pipeline.bind_set(
+          [&](auto set) {
+            if (pipeline.has_binding(1, 2))
+              mats[mesh.mat].metallic->bind_to_set(set, 2);
+            if (pipeline.has_binding(1, 1))
+              mats[mesh.mat].normal->bind_to_set(set, 1);
+            if (pipeline.has_binding(1, 0))
+              mats[mesh.mat].diffuse->bind_to_set(set, 0);
+          },
+          {mats[mesh.mat].metallic.get(), mats[mesh.mat].normal.get(),
+           mats[mesh.mat].diffuse.get()},
+          1, cmd);
 
       buffer->bind_vertex(mesh.vertex_offset);
       buffer->bind_index(mesh.index_offset);

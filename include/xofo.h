@@ -19,4 +19,6 @@
 
 #include <imgui_internal.h>
 
+#include <cube_map.h>
+
 #endif /* AAC5BC72_0E32_4519_9DDB_1EA9F7F41521 */

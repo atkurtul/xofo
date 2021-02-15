@@ -87,7 +87,7 @@ void main() {
     Lo += (kD * col / PI + specular) * radiance * NdotL;
   }
 
-  vec3 ambient = vec3(2) * col;
+  vec3 ambient = vec3(0.4) * col;
   vec3 color = ambient + Lo;
 
   color = color / (color + vec3(1.0));
