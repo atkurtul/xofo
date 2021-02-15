@@ -39,18 +39,14 @@ vec3 srgb_to_linear(vec3 c) {
   return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c));
 }
 
-void main() {
+void main1() {
   vec3 col = texture(albedo, tex).rgb;
-  vec3 metal = texture(metalic, tex).rgb * 0.0000001; 
   vec3 norm = texture(normal, tex).rgb * 2 - 1;
-  norm = normalize(norm_mat * norm +  cam.pos.xyz+ metal) *0.0000001;
-  out_color = vec4(col, 1);
-  // if (length(norm) > 100000) {
-  //    out_color = vec4(1);
-  // }
+  norm = normalize(norm_mat * norm);
+  out_color = vec4(norm, 1);
 }
 
-void main1() {
+void main() {
   vec3 col = texture(albedo, tex).rgb;
   vec3 metal = texture(metalic, tex).rgb;
   vec3 norm = texture(normal, tex).rgb * 2 - 1;
@@ -63,7 +59,7 @@ void main1() {
 
   // reflectance equation
   vec3 Lo = vec3(0.0);
-  for(int i = 0; i < cam.n_lights; ++i)
+  for(int i = 0; i < 0; ++i)
   {
     Light light = cam.lights[i];
     vec3 L = normalize(light.pos.xyz - frag_pos);
@@ -91,11 +87,11 @@ void main1() {
     Lo += (kD * col / PI + specular) * radiance * NdotL;
   }
 
-  vec3 ambient = vec3(0.01) * col;
+  vec3 ambient = vec3(2) * col;
   vec3 color = ambient + Lo;
 
   color = color / (color + vec3(1.0));
-  color = pow(color, vec3(1.0 / 2.2));
+  color = pow(color, vec3(0.455));
 
   out_color = vec4(color, 1.0);
 }

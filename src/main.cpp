@@ -94,7 +94,7 @@ void show_mesh_state(Mesh const& mesh) {
 }
 
 void show_texture(const char* name, Texture const& tex) {
-  ImGui::Text("%10s: %25s", name, tex.origin.data());
+  ImGui::Text("%s: %s", name, tex.origin.data());
   ImGui::Text("Width: %4u Height: %4u", tex.width, tex.height);
 }
 
@@ -110,8 +110,10 @@ void show_model(Model const& model) {
   for (auto mesh : model.meshes) {
     if (ImGui::TreeNode(("Mesh [" + to_string(idx++) + "]").data())) {
       show_mesh_state(mesh);
-      // show_material(model.mats[mesh.mat]);
+      show_material(model.mats[mesh.mat]);
+      ImGui::TreePop();
     }
+
   }
 
   ImGui::End();
@@ -132,14 +134,13 @@ int main() {
   auto uniform =
       xofo::Buffer::mk(65536, xofo::Buffer::Uniform, xofo::Buffer::Mapped);
 
-  // Model model0("models/sponza/sponza.gltf", *pipeline);
-
+  Model model0("models/sponza/sponza.gltf", *pipeline);
   Model model1("models/doom/0.obj", *pipeline);
-  // Model model2("models/batman/0.obj", *pipeline);
+  Model model2("models/batman/0.obj", *pipeline);
   // Model model3("models/heavy_assault_rifle/scene.gltf", *pipeline);
   // model0.scale = 0.1;
 
-  Model model0("models/Package/AncientTemple.obj", *pipeline);
+  //Model model0("models/Package/AncientTemple.obj", *pipeline);
 
   xofo::Camera cam(1600, 900);
 
@@ -161,6 +162,7 @@ int main() {
     verts[i * 4 + 2] = vec2(half, x);
     verts[i * 4 + 3] = vec2(-half, x);
   }
+
   f32 speed = 1.f;
   while (xofo::poll()) {
     f64 dt = xofo::dt();
@@ -195,12 +197,13 @@ int main() {
           pipeline->bind_set([&](auto set) { uniform->bind_to_set(set, 0); },
                              {uniform.get()});
 
-          // model0.draw(*pipeline, mat(1));
+          model0.draw(*pipeline, mat(1));
           model1.draw(*pipeline, mat(1));
+          model2.draw(*pipeline, mat(1));
 
           grid_pipe->bind();
           grid_buffer->bind_vertex();
-          vkCmdDraw(vk, 8008, 1, 0, 0);
+          vkCmdDraw(vk, 8004, 1, 0, 0);
         },
         [&]() {
           using namespace ImGui;
@@ -216,16 +219,7 @@ int main() {
           for (auto pipe : Pipeline::pipelines) {
             show_pipeline_state(*pipe);
           }
-          ImGui::Begin(model0.origin.data());
-          {
-            u32 idx = 0;
-            for (auto mesh : model0.meshes) {
-              if (TreeNode(("Mesh [" + to_string(idx++) + "]").data())) {
-                show_mesh_state(mesh);
-              }
-            }
-            ImGui::End();
-          }
+          show_model(model1);
         });
   }
   CHECKRE(vkDeviceWaitIdle(xofo::vk));

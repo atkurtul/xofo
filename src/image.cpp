@@ -138,22 +138,3 @@ Image::~Image() {
   vkDestroyImage(vk, image, 0);
   vmaFreeMemory(vk, allocation);
 }
-
-VkDescriptorSet Image::bind_to_set(VkDescriptorSet set, u32 bind) {
-  VkDescriptorImageInfo info = {
-      .sampler = sampler,
-      .imageView = view,
-      .imageLayout = layout,
-  };
-
-  VkWriteDescriptorSet write = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                                .dstSet = set,
-                                .dstBinding = bind,
-                                .descriptorCount = 1,
-                                .descriptorType = type,
-                                .pImageInfo = &info};
-
-  vkUpdateDescriptorSets(vk, 1, &write, 0, 0);
-
-  return set;
-}

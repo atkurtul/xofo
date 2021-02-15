@@ -46,36 +46,61 @@ struct Image : ShaderResource {
 
   ~Image();
 
-  VkDescriptorSet bind_to_set(VkDescriptorSet set, u32 bind);
+  VkDescriptorSet bind_to_set(VkDescriptorSet set, u32 bind) {
+    VkDescriptorImageInfo info = {
+        .sampler = sampler,
+        .imageView = view,
+        .imageLayout = layout,
+    };
 
-  protected:
+    VkWriteDescriptorSet write = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .dstSet = set,
+        .dstBinding = bind,
+        .descriptorCount = 1,
+        .descriptorType = type,
+        .pImageInfo = &info};
+
+    vkUpdateDescriptorSets(vk, 1, &write, 0, 0);
+
+    return set;
+  }
+
+ protected:
   Image(VkImageCreateInfo const& info, Type ty = Type::Standard);
   Image(VkFormat format,
-                       VkImageUsageFlags usage,
-                       VkExtent2D extent,
-                       u32 mip,
-                       Type ty = Type::Standard,
-                       VkSampleCountFlagBits ms = VK_SAMPLE_COUNT_1_BIT);
+        VkImageUsageFlags usage,
+        VkExtent2D extent,
+        u32 mip,
+        Type ty = Type::Standard,
+        VkSampleCountFlagBits ms = VK_SAMPLE_COUNT_1_BIT);
 };
 
-struct Texture : Image  {
+struct Texture : Image {
   static std::vector<Texture*> textures;
   std::string origin;
   static Box<Texture> mk(std::string file, VkFormat format);
-  static Box<Texture> mk(std::string tag, void* data, VkFormat format, u32 width, u32 height);
-
+  static Box<Texture> mk(std::string tag,
+                         void* data,
+                         VkFormat format,
+                         u32 width,
+                         u32 height);
 
   static Box<Texture> load_cubemap_ktx(std::string file, VkFormat format);
-  static Box<Texture> load_cubemap_6_files_from_folder(std::string folder, VkFormat format);
-  static Box<Texture> load_cubemap_single_file(std::string folder, VkFormat format);
+  static Box<Texture> load_cubemap_6_files_from_folder(std::string folder,
+                                                       VkFormat format);
+  static Box<Texture> load_cubemap_single_file(std::string folder,
+                                               VkFormat format);
+  VkDescriptorSet bind_to_set(VkDescriptorSet set, u32 bind) {
+    // std::cout << origin << " -- binding to set " << set << ":" << bind
+    // <<"\n";
+    return Image::bind_to_set(set, bind);
+  }
 
-  private:
+ private:
   using Image::Image;
 };
 
-
 }  // namespace xofo
-
-
 
 #endif /* B4289538_0D44_47DC_927C_CB5FB0CAE07A */

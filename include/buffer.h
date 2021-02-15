@@ -1,7 +1,7 @@
 #ifndef D8F23374_2F16_4692_A5AE_7D3369B8E620
 #define D8F23374_2F16_4692_A5AE_7D3369B8E620
-#include "core.h"
 #include <vulkan/vulkan_core.h>
+#include "core.h"
 
 namespace xofo {
 struct Buffer : ShaderResource {
@@ -43,8 +43,6 @@ struct Buffer : ShaderResource {
 
   ~Buffer() { vmaDestroyBuffer(vk, buffer, allocation); }
 
-  static Box<Buffer> mk(size_t size, VkBufferUsageFlags usage, Mapping);
-
   VkDescriptorSet bind_to_set(VkDescriptorSet set, u32 bind) {
     VkDescriptorBufferInfo info = {
         .buffer = buffer,
@@ -63,6 +61,11 @@ struct Buffer : ShaderResource {
     vkUpdateDescriptorSets(vk, 1, &write, 0, 0);
     return set;
   }
+
+  static Box<Buffer> mk(u64 size, VkBufferUsageFlags usage, Mapping);
+
+ protected:
+  Buffer(u64 size, VkBufferUsageFlags usage, Mapping);
 };
 
 }  // namespace xofo

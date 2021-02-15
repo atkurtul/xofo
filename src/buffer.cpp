@@ -3,7 +3,7 @@
 
 using namespace xofo;
 
-Box<Buffer> Buffer::mk(size_t size, VkBufferUsageFlags usage, Mapping map) {
+Buffer::Buffer(u64 size, VkBufferUsageFlags usage, Mapping map) {
   VkBufferCreateInfo buffer_info = {
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
       .size = size,
@@ -23,17 +23,13 @@ Box<Buffer> Buffer::mk(size_t size, VkBufferUsageFlags usage, Mapping map) {
       };
       break;
   }
-  VkBuffer buffer;
-  VmaAllocation allocation;
   VmaAllocationInfo alloc_info;
   CHECKRE(vmaCreateBuffer(vk, &buffer_info, &allocation_info, &buffer,
                           &allocation, &alloc_info));
 
-                          
-  return Box<Buffer>(new Buffer {
-      .buffer = buffer,
-      .mapping = (u8*)alloc_info.pMappedData,
-      .allocation = allocation,
-  });
+  mapping = (u8*)alloc_info.pMappedData;
 }
 
+Box<Buffer> Buffer::mk(u64 size, VkBufferUsageFlags usage, Mapping map) {
+  return Box<Buffer>(new Buffer(size, usage, map));
+}

@@ -1,9 +1,10 @@
 #ifndef B6EB7CB5_9227_4FBF_9721_005CAC0511AA
 #define B6EB7CB5_9227_4FBF_9721_005CAC0511AA
 
+#include <vulkan/vulkan_core.h>
 #include <functional>
 #include <type_traits>
-#include <vulkan/vulkan_core.h>
+#include <unordered_map>
 #include "core.h"
 
 namespace xofo {
@@ -23,7 +24,6 @@ struct StageInputs {
 
 struct SetLayout {
   VkDescriptorSetLayout layout;
-  std::vector<VkDescriptorType> bindings;
 
   operator VkDescriptorSetLayout() const { return layout; }
 
@@ -33,12 +33,26 @@ struct SetLayout {
         .bindingCount = (u32)bindings.size(),
         .pBindings = bindings.data(),
     };
+
     CHECKRE(vkCreateDescriptorSetLayout(vk, &info, 0, &layout));
 
     for (auto& binding : bindings) {
-      this->bindings.push_back(binding.descriptorType);
+      this->bindings[binding.binding] = binding.descriptorType;
     }
   }
+
+  bool has_binding(u32 idx, VkDescriptorType* out = 0) {
+    if (bindings.find(idx) != bindings.end()) {
+      if (out) {
+        *out = bindings[idx];
+      }
+      return true;
+    }
+    return false;
+  }
+
+ private:
+  std::unordered_map<u32, VkDescriptorType> bindings;
 };
 
 struct PipelineState {
@@ -49,7 +63,6 @@ struct PipelineState {
   bool depth_write = true;
   f32 line_width = 1;
 };
-
 
 struct vector_hasher {
   u64 operator()(std::vector<ShaderResource*> const& v) const {
@@ -68,7 +81,10 @@ struct Pipeline {
 
   std::vector<SetLayout> set_layouts;
   std::vector<VkDescriptorPool> pools;
-  std::unordered_map<std::vector<ShaderResource*>, VkDescriptorSet, vector_hasher> sets;
+  std::unordered_map<std::vector<ShaderResource*>,
+                     VkDescriptorSet,
+                     vector_hasher>
+      sets;
 
   StageInputs inputs;
 
@@ -100,7 +116,18 @@ struct Pipeline {
     reset();
   }
 
-  VkDescriptorSet bind_set(std::function<void(VkDescriptorSet)> const& write_set, std::vector<ShaderResource*> const& res, u32 idx = 0, VkCommandBuffer cmd = vk) {
+  bool has_binding(u32 set, u32 idx, VkDescriptorType* out = 0) {
+      if (set_layouts.size() <= set) {
+        return false;
+      }
+      return set_layouts[set].has_binding(idx, out);
+  }
+
+  VkDescriptorSet bind_set(
+      std::function<void(VkDescriptorSet)> const& write_set,
+      std::vector<ShaderResource*> const& res,
+      u32 idx = 0,
+      VkCommandBuffer cmd = vk) {
     auto& set = sets[res];
     if (!set) {
       VkDescriptorSetAllocateInfo info = {
@@ -114,7 +141,7 @@ struct Pipeline {
     }
 
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, idx,
-                          1, &set, 0, 0);
+                            1, &set, 0, 0);
     return set;
   }
 

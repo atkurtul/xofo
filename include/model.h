@@ -44,16 +44,12 @@ struct Model {
       for (auto& mat : mats) {
         pipeline.bind_set(
             [&](auto set) {
-              switch (pipeline.set_layouts[1].bindings.size()) {
-                default:
-                case 3:
-                  mat.metallic->bind_to_set(set, 2);
-                case 2:
-                  mat.normal->bind_to_set(set, 1);
-                case 1:
-                  mat.diffuse->bind_to_set(set, 0);
-                case 0:;
-              }
+              if (pipeline.has_binding(1, 2))
+                mat.metallic->bind_to_set(set, 2);
+              if (pipeline.has_binding(1, 1))
+                mat.normal->bind_to_set(set, 1);
+              //if (pipeline.has_binding(1, 0))
+              mat.diffuse->bind_to_set(set, 0);
             },
             {mat.metallic.get(), mat.normal.get(), mat.diffuse.get()}, 1, cmd);
       }
