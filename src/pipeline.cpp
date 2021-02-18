@@ -1,11 +1,8 @@
 
+#include <fstream>
 #include <xofo.h>
 
 #include <spirv_reflect.h>
-
-#ifndef GLSLC_EXE
-#define GLSLC_EXE "glslc"
-#endif
 
 using namespace std;
 using namespace xofo;
@@ -38,12 +35,13 @@ uint32_t type_stride(SpvReflectTypeDescription* ty) {
 
 static Shader compile_shader(string const& file, VkShaderStageFlags stage) {
   auto out = file + ".spv";
-  auto cmd = string(GLSLC_EXE) + " " + file + " -o " + out;
-  cout << GLSLC_EXE << "\n";
-  if (system(cmd.data())) {
+  
+  auto cmd = "glslc "+ file + " -o " + out;
+
+  if (system(cmd.data()) || !std::ifstream(out, ios::binary).good()) {
     abort();
   }
-
+  
   Shader shader = {
       .bytecode = read_binary(out.data()),
   };

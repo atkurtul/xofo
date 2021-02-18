@@ -7,14 +7,13 @@ find_library(mango_LIBRARIES
   HINTS lib)
 
 
-message("mango_INCLUDE_DIRS = ${mango_INCLUDE_DIRS}")
-
 include(FindPackageHandleStandardArgs)
 
 find_package_handle_standard_args(mango
   DEFAULT_MSG
   mango_LIBRARIES mango_INCLUDE_DIRS)
-  
+
+
 mark_as_advanced(mango_INCLUDE_DIRS mango_LIBRARIES)
 
 if(mango_FOUND AND NOT TARGET mango::mango)

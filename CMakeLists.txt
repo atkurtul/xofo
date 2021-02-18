@@ -13,11 +13,9 @@ endif()
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 find_package(Vulkan REQUIRED)
-find_package(assimp REQUIRED)
+find_package(ASSIMP REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(mango REQUIRED)
-
-add_compile_definitions("GLSLC_EXE=\"${Vulkan_GLSLC_EXECUTABLE}\"")
 
 file(GLOB imgui_src ${CMAKE_CURRENT_SOURCE_DIR}/lib/imgui/*.cpp)
 add_library(imgui ${imgui_src})
@@ -35,7 +33,7 @@ target_link_directories(xofo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lib)
 
 target_link_libraries(xofo ${Vulkan_LIBRARIES})
 target_link_libraries(xofo ${mango_LIBRARIES})
-target_link_libraries(xofo assimp::assimp)
+target_link_libraries(xofo ${ASSIMP_LIBRARIES})
 target_link_libraries(xofo glfw)
 target_link_libraries(xofo imgui)
 target_link_libraries(xofo spirv-reflect)
