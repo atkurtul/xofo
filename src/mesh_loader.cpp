@@ -97,6 +97,7 @@ Bbox MeshLoader::load_geometry(u8* buffer) {
 }
 
 std::vector<Material> MeshLoader::load_materials() {
+  
   unordered_map<string, Rc<Texture>> textures;
   std::vector<Material> mats;
 

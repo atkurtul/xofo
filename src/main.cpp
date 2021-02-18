@@ -1,10 +1,8 @@
-#include "imgui.h"
 #include <xofo.h>
-
+#include "imgui.h"
 
 using namespace std;
 using namespace xofo;
-
 
 int main() {
   cout << "In main\n";
@@ -26,14 +24,15 @@ int main() {
   cout << "Loading models\n";
   auto t0 = Clock::now();
   Model model0("models/sponza/sponza.gltf", *pipeline);
-  // Model model1("models/doom/0.obj", *pipeline);
+  Model model1("models/doom/0.obj", *pipeline);
   Model model2("models/batman/0.obj", *pipeline);
   auto t1 = Clock::now();
-  cout << "Loaded models in: "<< chrono::duration_cast<chrono::milliseconds>(t1-t0).count() << "\n";
+  cout << "Loaded models in: "
+       << chrono::duration_cast<chrono::milliseconds>(t1 - t0).count() << "\n";
   // Model model3("models/heavy_assault_rifle/scene.gltf", *pipeline);
   // model0.scale = 0.1;
 
-  //Model model0("models/Package/AncientTemple.obj", *pipeline);
+  // Model model0("models/Package/AncientTemple.obj", *pipeline);
 
   xofo::Camera cam(1600, 900);
 
@@ -92,8 +91,8 @@ int main() {
           pipeline->bind_set([&](auto set) { uniform->bind_to_set(set, 0); },
                              {uniform.get()});
 
-          // model0.draw(*pipeline, mat(0.1));
-          // model1.draw(*pipeline, mat(1));
+          model0.draw(*pipeline, mat(0.1));
+          model1.draw(*pipeline, mat(1));
           model2.draw(*pipeline, mat(1));
 
           grid_pipe->bind();
@@ -104,12 +103,20 @@ int main() {
           using namespace ImGui;
           ImGui::BeginMainMenuBar();
           {
+            {
+              static float timer = 0, dtt = dt;
+              if ((timer += dt) > 0.2)
+                timer = 0, dtt = 1.f / dt;
+              ImGui::Text("%f\n", dtt);
+            }
+            
             if (ImGui::BeginMenu("File")) {
               // void ShowExampleMenuFile();
               // ShowExampleMenuFile();
               ImGui::EndMenu();
             }
           }
+
           ImGui::EndMainMenuBar();
 
           for (auto pipe : Pipeline::pipelines) {
