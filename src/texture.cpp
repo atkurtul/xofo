@@ -232,10 +232,10 @@ void copy_texture(VkCommandBuffer cmd,
 }
 
 void generate_mips(VkCommandBuffer cmd,
-                   uint mip,
+                   u32 mip,
                    VkImage image,
                    VkExtent2D extent) {
-  for (uint i = 1; i < mip; ++i) {
+  for (u32 i = 1; i < mip; ++i) {
     VkImageBlit image_blit = {
         .srcSubresource =
             {
@@ -289,71 +289,6 @@ void add_pixel(u8* acc, u8* pix) {
   acc[3] += (u32)pix[3];
 }
 
-u8* blurx(mango::Bitmap& bmap) {
-  u64 size = bmap.height * bmap.width * 4;
-  u8* re = (u8*)malloc(size);
-  // memcpy(re, bmap.image, size);
-  for (int j = 0; j < bmap.height; ++j) {
-    for (int i = 0; i < bmap.width; ++i) {
-      u32 sum[4] = {0};
-
-      re[i * 4 + j * bmap.stride + 0] = bmap.address(i, j)[0];
-      bmap.image[i * 4 + j * bmap.stride + 0];
-      re[i * 4 + j * bmap.stride + 1] = bmap.address(i, j)[1];
-      bmap.image[i * 4 + j * bmap.stride + 1];
-      re[i * 4 + j * bmap.stride + 2] = bmap.address(i, j)[2];
-      bmap.image[i * 4 + j * bmap.stride + 2];
-      re[i * 4 + j * bmap.stride + 3] = bmap.address(i, j)[3];
-      bmap.image[i * 4 + j * bmap.stride + 3];
-    }
-  }
-  return re;
-}
-
-u8* blur(mango::Bitmap& bmap) {
-  u8* re = (u8*)calloc(1, bmap.height * bmap.width * 4);
-
-  for (int j = 0; j < bmap.height; ++j) {
-    for (int i = 0; i < bmap.width; ++i) {
-      if ((i < 1) || (j < 1) || ((i + 1) == bmap.width) ||
-          ((j + 1) == bmap.height)) {
-        continue;
-      }
-      u8* addr = re + (i * 4) + (j * bmap.stride);
-      u8 sum1[4] = {0};
-      u8 sum2[4] = {0};
-      u8 sum3[4] = {0};
-      add_pixel(sum1, bmap.address(i, j));
-      add_pixel(sum1, bmap.address(i, j + 1));
-      add_pixel(sum1, bmap.address(i, j - 1));
-      add_pixel(sum2, bmap.address(i + 1, j));
-      add_pixel(sum2, bmap.address(i + 1, j + 1));
-      add_pixel(sum2, bmap.address(i + 1, j - 1));
-      add_pixel(sum3, bmap.address(i - 1, j));
-      add_pixel(sum3, bmap.address(i - 1, j + 1));
-      add_pixel(sum3, bmap.address(i - 1, j - 1));
-      sum1[0] /= 3;
-      sum2[0] /= 3;
-      sum3[0] /= 3;
-      sum1[1] /= 3;
-      sum2[1] /= 3;
-      sum3[1] /= 3;
-      sum1[2] /= 3;
-      sum2[2] /= 3;
-      sum3[2] /= 3;
-      sum1[3] /= 3;
-      sum2[3] /= 3;
-      sum3[3] /= 3;
-      add_pixel(addr, sum1);
-      add_pixel(addr, sum2);
-      add_pixel(addr, sum3);
-    }
-    // cout << "WTf mann\n";
-  }
-  cout << "Done\n";
-  return re;
-}
-
 Box<Texture> xofo::Texture::mk(std::string tag, void* data,
                                VkFormat format,
                                u32 width,
@@ -388,145 +323,11 @@ Box<Texture> Texture::mk(string file, VkFormat format) {
   return Texture::mk(move(file), bitmap.image, format, bitmap.width, bitmap.height);
 }
 
-using namespace xofo;
-
-#include <ktx.h>
-#include <ktxvulkan.h>
-
-const char* err_code_str(KTX_error_code err);
-
-const char* err_code_str(KTX_error_code err) {
-  switch (err) {
-    case KTX_SUCCESS:
-      return "SUCCESS";
-    case KTX_FILE_DATA_ERROR:
-      return "FILE_DATA_ERROR";
-    case KTX_FILE_OPEN_FAILED:
-      return "FILE_OPEN_FAILED";
-    case KTX_FILE_OVERFLOW:
-      return "FILE_OVERFLOW";
-    case KTX_FILE_READ_ERROR:
-      return "FILE_READ_ERROR";
-    case KTX_FILE_SEEK_ERROR:
-      return "FILE_SEEK_ERROR";
-    case KTX_FILE_UNEXPECTED_EOF:
-      return "FILE_UNEXPECTED_EOF";
-    case KTX_FILE_WRITE_ERROR:
-      return "FILE_WRITE_ERROR";
-    case KTX_GL_ERROR:
-      return "GL_ERROR";
-    case KTX_INVALID_OPERATION:
-      return "INVALID_OPERATION";
-    case KTX_INVALID_VALUE:
-      return "INVALID_VALUE";
-    case KTX_NOT_FOUND:
-      return "NOT_FOUND";
-    case KTX_OUT_OF_MEMORY:
-      return "OUT_OF_MEMORY";
-    case KTX_UNKNOWN_FILE_FORMAT:
-      return "UNKNOWN_FILE_FORMAT";
-    case KTX_UNSUPPORTED_TEXTURE_TYPE:
-      return "UNSUPPORTED_TEXTURE_TYPE";
-  }
-  return "";
-}
-
 vector<u64> sub_vec(vector<u64> const& a, vector<u64> const& b) {
   vector<u64> re;
   for (int i = 0; i < a.size(); ++i)
     re.push_back(a[i] - b[i]);
   return re;
-}
-
-Box<Texture> Texture::load_cubemap_ktx(string file, VkFormat format) {
-  ktxTexture* tex;
-  ktxResult result = ktxTexture_CreateFromNamedFile(
-      file.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &tex);
-  if (result) {
-    cerr << "Err loading " << file << "\n";
-    abort();
-  }
-
-  u32 width = tex->baseWidth;
-  u32 height = tex->baseHeight;
-
-  u32 mip = tex->numLevels;
-  u64 size = ktxTexture_GetSize(tex);
-  u8* data = ktxTexture_GetData(tex);
-
-  auto staging = Buffer::mk(size, Buffer::Src, Buffer::Mapped);
-  memcpy(staging->mapping, data, size);
-
-  // Create optimal tiled target image
-  VkImageCreateInfo image_info = {
-      .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-      // This flag is required for cube map images
-      .flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT,
-      .imageType = VK_IMAGE_TYPE_2D,
-      .format = format,
-      .extent = {width, height, 1},
-      .mipLevels = mip,
-      // Cube faces count as array layers in Vulkan
-      .arrayLayers = 6,
-      .samples = VK_SAMPLE_COUNT_1_BIT,
-      .tiling = VK_IMAGE_TILING_OPTIMAL,
-      .usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-      .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-      .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-  };
-
-  auto texture = new Texture(image_info, Image::Type::CubeMap);
-
-  vector<VkBufferImageCopy> regions;
-  regions.reserve(6 * mip);
-
-  for (uint32_t face = 0; face < 6; face++) {
-    for (uint32_t level = 0; level < mip; level++) {
-      // Calculate offset into staging buffer for the current mip level and face
-      ktx_size_t offset;
-      KTX_error_code ret =
-          ktxTexture_GetImageOffset(tex, level, 0, face, &offset);
-
-      if (ret) {
-        cerr << err_code_str(ret) << "\n";
-        abort();
-      }
-      VkBufferImageCopy region = {
-          .bufferOffset = offset,
-          .imageExtent = {.width = width >> level,
-                          .height = height >> level,
-                          .depth = 1},
-      };
-      region.imageSubresource = {
-          .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-          .mipLevel = level,
-          .baseArrayLayer = face,
-          .layerCount = 1,
-      };
-      regions.push_back(region);
-    }
-  }
-
-  VkImageSubresourceRange subrange = {
-      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-      .baseMipLevel = 0,
-      .levelCount = mip,
-      .layerCount = 6,
-  };
-
-  xofo::execute([&](auto cmd) {
-    set_image_layout(cmd, *texture, ImageLayout::Undefined, ImageLayout::Dst,
-                     subrange);
-
-    vkCmdCopyBufferToImage(cmd, *staging, *texture, ImageLayout::Dst,
-                           regions.size(), regions.data());
-
-    set_image_layout(cmd, *texture, ImageLayout::Dst, ImageLayout::ShaderReadOnly,
-                     subrange, PipelineStage::Transfer,
-                     PipelineStage::FragmentShader);
-  });
-
-  return Box<Texture>(texture);
 }
 
 Box<Texture> Texture::load_cubemap_6_files_from_folder(string folder, VkFormat format) {

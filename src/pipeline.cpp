@@ -1,7 +1,11 @@
+
 #include <xofo.h>
 
-#include <shaderc/shaderc.hpp>
-#include <spirv_cross/spirv_cross.hpp>
+#include <spirv_reflect.h>
+
+#ifndef GLSLC_EXE
+#define GLSLC_EXE "glslc"
+#endif
 
 using namespace std;
 using namespace xofo;
@@ -10,68 +14,41 @@ vector<Pipeline*> Pipeline::pipelines;
 
 static string read_to_string(const char* file) {
   ifstream t(file);
-  return string(istreambuf_iterator<char>(t), istreambuf_iterator<char>());
+  return string(istreambuf_iterator(t), istreambuf_iterator<char>());
 }
 
-static vector<u32> compile_glsl(const char* file, shaderc_shader_kind stage) {
-  auto src = read_to_string(file);
-  shaderc::Compiler comp;
-  shaderc::CompileOptions opt;
-  // opt.SetOptimizationLevel(shaderc_optimization_level_performance);
+static vector<u32> read_binary(const char* file) {
+  ifstream t(file, ios::binary);
+  auto tmp =
+      vector<u8>(istreambuf_iterator<char>(t), istreambuf_iterator<char>());
+  return vector<u32>((u32*)tmp.data(), (u32*)(tmp.data() + tmp.size()));
+}
 
-  auto re = comp.CompileGlslToSpv(src.c_str(), src.size(), stage, file, opt);
-  if (re.GetCompilationStatus()) {
-    cerr << re.GetErrorMessage() << "\n";
+uint32_t type_stride(SpvReflectTypeDescription* ty) {
+  auto num = ty->traits.numeric;
+  auto width = num.scalar.width >> 3;
+  if (ty->type_flags & SPV_REFLECT_TYPE_FLAG_MATRIX) {
+    return width * num.matrix.row_count * num.matrix.column_count;
+  }
+  if (ty->type_flags & SPV_REFLECT_TYPE_FLAG_VECTOR) {
+    return width * num.vector.component_count;
+  }
+  return width;
+}
+
+static Shader compile_shader(string const& file, VkShaderStageFlags stage) {
+  auto out = file + ".spv";
+  auto cmd = string(GLSLC_EXE) + " " + file + " -o " + out;
+  cout << GLSLC_EXE << "\n";
+  if (system(cmd.data())) {
     abort();
   }
-  //cout << "Size is: " << re.end() - re.begin() << "\n";
-  return vector<u32>(re.begin(), re.end());
-}
 
-static VkFormat type_format(int basetype, int vecsize) {
-  switch (basetype) {
-    case spirv_cross::SPIRType::Int:
-      switch (vecsize) {
-        case 1:
-          return VK_FORMAT_R32_SINT;
-        case 2:
-          return VK_FORMAT_R32G32_SINT;
-        case 3:
-          return VK_FORMAT_R32G32B32_SINT;
-        case 4:
-          return VK_FORMAT_R32G32B32A32_SINT;
-      }
-    case spirv_cross::SPIRType::UInt:
-      switch (vecsize) {
-        case 1:
-          return VK_FORMAT_R32_UINT;
-        case 2:
-          return VK_FORMAT_R32G32_UINT;
-        case 3:
-          return VK_FORMAT_R32G32B32_UINT;
-        case 4:
-          return VK_FORMAT_R32G32B32A32_UINT;
-      }
-    case spirv_cross::SPIRType::Float:
-      switch (vecsize) {
-        case 1:
-          return VK_FORMAT_R32_SFLOAT;
-        case 2:
-          return VK_FORMAT_R32G32_SFLOAT;
-        case 3:
-          return VK_FORMAT_R32G32B32_SFLOAT;
-        case 4:
-          return VK_FORMAT_R32G32B32A32_SFLOAT;
-      }
-      break;
-    default:
-      throw;
-  }
-  throw;
-}
+  Shader shader = {
+      .bytecode = read_binary(out.data()),
+  };
 
-static Shader compile_shader(string const& file, shaderc_shader_kind stage) {
-  Shader shader = {.bytecode = compile_glsl(file.c_str(), stage)};
+  remove(out.data());
 
   VkShaderModuleCreateInfo module_info = {
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
@@ -83,89 +60,78 @@ static Shader compile_shader(string const& file, shaderc_shader_kind stage) {
   return shader;
 }
 
-namespace sc = spirv_cross;
+void build_set_layouts(vector<SpvReflectDescriptorBinding*>& bindings,
+                       vector<vector<VkDescriptorSetLayoutBinding>>& layouts,
+                       VkShaderStageFlags stage) {
+  std::sort(bindings.begin(), bindings.end(), [](auto a, auto b) {
+    return (a->set != b->set) ? (a->set < b->set) : (a->binding < b->binding);
+  });
 
-static void build_set_layouts(
-    sc::Compiler& cc,
-    sc::SmallVector<sc::Resource> const& res,
-    VkDescriptorType ty,
-    VkShaderStageFlags stage,
-    vector<vector<VkDescriptorSetLayoutBinding>>& bindings) {
-  for (auto& res : res) {
-    auto set =
-        cc.get_decoration(res.id, spv::Decoration::DecorationDescriptorSet);
-    auto bind = cc.get_decoration(res.id, spv::Decoration::DecorationBinding);
-    if (bindings.size() < set + 1) {
-      bindings.resize(set + 1);
+  for (auto bind : bindings) {
+    if (layouts.size() <= bind->set) {
+      layouts.resize(bind->set + 1);
     }
-    if (bindings[set].size() < bind + 1) {
-      bindings[set].resize(bind + 1);
+    if (layouts[bind->set].size() <= bind->binding) {
+      layouts[bind->set].resize(bind->binding + 1);
     }
-    // cout << set << ":" << bind << "\n";
-    // cout << "\t" << desc_type_string(ty) << "\n";
-    auto& desc = bindings[set][bind];
+    auto& desc = layouts[bind->set][bind->binding];
+    auto desc_ty = (VkDescriptorType)bind->descriptor_type;
     if (desc.descriptorCount != 0) {
-      if (desc.descriptorType != ty) {
+      if (desc.descriptorType != desc_ty ||
+          desc.descriptorCount != bind->count) {
         throw;
       }
     }
-    desc.binding = bind;
-    desc.descriptorType = ty;
-    desc.descriptorCount = 1;
+    desc.binding = bind->binding;
+    desc.descriptorType = desc_ty;
+    desc.descriptorCount = bind->count;
     desc.stageFlags |= stage;
   }
 }
 
-static StageInputs extract_input_state_and_uniforms(
-    vector<u32> const& bytecode,
-    VkShaderStageFlags stage,
-    vector<vector<VkDescriptorSetLayoutBinding>>& bindings) {
-  sc::Compiler cc(bytecode);
-  auto res = cc.get_shader_resources();
+StageInputs get_stage_inputs(vector<SpvReflectInterfaceVariable*>& vars) {
+  StageInputs inputs = {};
 
-  build_set_layouts(cc, res.uniform_buffers, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                    stage, bindings);
-  build_set_layouts(cc, res.storage_buffers, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                    stage, bindings);
-  build_set_layouts(cc, res.subpass_inputs, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
-                    stage, bindings);
-  build_set_layouts(cc, res.storage_images, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-                    stage, bindings);
-  build_set_layouts(cc, res.sampled_images,
-                    VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                    // VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-                    stage, bindings);
+  std::sort(vars.begin(), vars.end(),
+            [](auto a, auto b) { return a->location < b->location; });
 
-  if (stage != VK_SHADER_STAGE_VERTEX_BIT)
-    return {};
+  for (auto var : vars) {
+    auto input = &inputs.per_vertex;
+    uint32_t binding = 0;
 
-  map<u32, VkVertexInputAttributeDescription> inputs;
-
-  for (auto& input : res.stage_inputs) {
-    auto loc = cc.get_decoration(input.id, spv::Decoration::DecorationLocation);
-    auto ty = cc.get_type(input.type_id);
-    VkFormat format = type_format(ty.basetype, ty.vecsize);
-    inputs[loc] = VkVertexInputAttributeDescription{
-        .location = loc,
-        .binding = loc >= 10,
-        .format = format,
-        .offset =
-            ty.vecsize * 4,  // this isnt offset. it will be calculated later
-    };
-  }
-
-  StageInputs input = {};
-  for (auto& [k, v] : inputs) {
-    auto* into = &input.per_vertex;
-    if (k >= 10) {
-      into = &input.per_instance;
+    if (var->location >= 10) {
+      input = &inputs.per_instance;
+      binding = 1;
     }
-    into->attr.push_back(v);
-    into->attr.back().offset = into->stride;
-    into->stride += v.offset;
+
+    input->attr.push_back({.location = var->location,
+                           .binding = binding,
+                           .format = (VkFormat)var->format,
+                           .offset = input->stride});
+    input->stride += type_stride(var->type_description);
   }
 
-  return input;
+  return inputs;
+}
+
+static StageInputs extract_input_state_and_uniforms(
+    vector<uint32_t> const& bytecode,
+    vector<vector<VkDescriptorSetLayoutBinding>>& layouts) {
+  spv_reflect::ShaderModule obj(bytecode);
+
+  CHECKRE((VkResult)obj.GetResult());
+  uint32_t count;
+
+  CHECKRE((VkResult)obj.EnumerateInputVariables(&count, 0));
+  vector<SpvReflectInterfaceVariable*> vars(count);
+  CHECKRE((VkResult)obj.EnumerateInputVariables(&count, vars.data()));
+
+  CHECKRE((VkResult)obj.EnumerateDescriptorBindings(&count, 0));
+  vector<SpvReflectDescriptorBinding*> bindings(count);
+  CHECKRE((VkResult)obj.EnumerateDescriptorBindings(&count, bindings.data()));
+
+  build_set_layouts(bindings, layouts, obj.GetShaderStage());
+  return get_stage_inputs(vars);
 }
 
 Box<Pipeline> Pipeline::mk(string const& shader, PipelineState const& state) {
@@ -178,17 +144,15 @@ Box<Pipeline> Pipeline::mk(string const& shader, PipelineState const& state) {
 Pipeline::Pipeline(string const& shader, PipelineState const& state)
     : shader(shader),
       shaders{
-          compile_shader(shader + ".vert", shaderc_vertex_shader),
-          compile_shader(shader + ".frag", shaderc_fragment_shader),
+          compile_shader(shader + ".vert", VK_SHADER_STAGE_VERTEX_BIT),
+          compile_shader(shader + ".frag", VK_SHADER_STAGE_FRAGMENT_BIT),
       },
       state(state) {
   vector<vector<VkDescriptorSetLayoutBinding>> bindings;
 
-  inputs = extract_input_state_and_uniforms(
-      shaders[0].bytecode, VK_SHADER_STAGE_VERTEX_BIT, bindings);
+  inputs = extract_input_state_and_uniforms(shaders[0].bytecode, bindings);
 
-  extract_input_state_and_uniforms(shaders[1].bytecode,
-                                   VK_SHADER_STAGE_FRAGMENT_BIT, bindings);
+  extract_input_state_and_uniforms(shaders[1].bytecode, bindings);
 
   // decriptor pool
   for (auto& bindings : bindings) {
@@ -249,8 +213,8 @@ Pipeline::Pipeline(string const& shader, PipelineState const& state)
 void Pipeline::recompile() {
   vkDestroyShaderModule(vk, shaders[0], 0);
   vkDestroyShaderModule(vk, shaders[1], 0);
-  shaders[0] = compile_shader(shader + ".vert", shaderc_vertex_shader);
-  shaders[1] = compile_shader(shader + ".frag", shaderc_fragment_shader);
+  shaders[0] = compile_shader(shader + ".vert", VK_SHADER_STAGE_VERTEX_BIT);
+  shaders[1] = compile_shader(shader + ".frag", VK_SHADER_STAGE_FRAGMENT_BIT);
   reset();
 }
 
@@ -345,7 +309,7 @@ void Pipeline::create() {
 
   VkPipelineDepthStencilStateCreateInfo DepthStencilState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-      .depthTestEnable  = state.depth_test,
+      .depthTestEnable = state.depth_test,
       .depthWriteEnable = state.depth_write,
       .depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
   };
@@ -375,8 +339,8 @@ void Pipeline::create() {
   VkPipelineRasterizationStateCreateInfo RasterizationState = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
       .polygonMode = state.polygon,
-      .cullMode    = state.culling,
-      .lineWidth   = state.line_width};
+      .cullMode = state.culling,
+      .lineWidth = state.line_width};
 
   VkGraphicsPipelineCreateInfo info = {
       .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
@@ -396,7 +360,6 @@ void Pipeline::create() {
 
   CHECKRE(vkCreateGraphicsPipelines(vk, 0, 1, &info, 0, &pipeline));
 }
-
 
 Pipeline::~Pipeline() {
   pipelines.erase(find(pipelines.begin(), pipelines.end(), this));

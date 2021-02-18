@@ -5,7 +5,6 @@
 #include <assimp/types.h>
 #include <assimp/Importer.hpp>
 
-
 using namespace std;
 using namespace xofo;
 
@@ -24,6 +23,7 @@ MeshLoader::~MeshLoader() {
 }
 
 std::vector<Mesh> MeshLoader::import(u32 flags) {
+  auto t0 = Clock::now();
   scene = importer->ReadFile(file, aiProcess_Triangulate | aiProcess_FlipUVs |
                                        aiProcess_GenSmoothNormals |
                                        aiProcess_CalcTangentSpace |
@@ -47,11 +47,13 @@ std::vector<Mesh> MeshLoader::import(u32 flags) {
     size += indices + vertices;
     meshes.push_back(mm);
   }
-
+  auto t1 = Clock::now();
+  cout << file << " Loaded Meshes in: "<< chrono::duration_cast<chrono::milliseconds>(t1-t0).count() << "\n";
   return meshes;
 }
 
 Bbox MeshLoader::load_geometry(u8* buffer) {
+  //auto t0 = Clock::now();
   Bbox box = { };
 
   for (u32 i = 0; i < scene->mNumMeshes; ++i) {
@@ -88,6 +90,9 @@ Bbox MeshLoader::load_geometry(u8* buffer) {
       buffer += 12;
     }
   }
+  
+  //auto t1 = Clock::now();
+  //cout  << file << " Loaded geometry in: "<< chrono::duration_cast<chrono::milliseconds>(t1-t0).count() << "\n";
   return box;
 }
 

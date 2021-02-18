@@ -87,7 +87,6 @@ struct Texture : Image {
                          u32 width,
                          u32 height);
 
-  static Box<Texture> load_cubemap_ktx(std::string file, VkFormat format);
   static Box<Texture> load_cubemap_6_files_from_folder(std::string folder,
                                                        VkFormat format);
   static Box<Texture> load_cubemap_single_file(std::string folder,

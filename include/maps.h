@@ -1,30 +1,4 @@
-#ifndef A35B3A46_E1FF_4F3E_A823_A233A8C2305F
-#define A35B3A46_E1FF_4F3E_A823_A233A8C2305F
-
-#include "core.h"
-
-template <class V>
-bool imgui_combo(const char* mode_name,
-                 std::vector<std::pair<std::string, V>> const& map,
-                 u32& selected) {
-  bool re = false;
-  if (ImGui::BeginCombo(mode_name, map[selected].first.data())) {
-    u32 i = 0;
-    for (auto& [k, v] : map) {
-      bool is_selected = i == selected;
-      if (ImGui::Selectable(map[i].first.data(), is_selected)) {
-        selected = i;
-        re = true;
-      }
-      if (is_selected)
-        ImGui::SetItemDefaultFocus();
-      i++;
-    }
-    ImGui::EndCombo();
-  }
-  return re;
-}
-
+#include <core.h>
 extern const std::vector<std::pair<std::string, VkResult>> Result_map;
 extern const std::vector<std::pair<std::string, VkStructureType>> StructureType_map;
 extern const std::vector<std::pair<std::string, VkImageLayout>> ImageLayout_map;
@@ -201,4 +175,3 @@ extern const std::vector<std::pair<std::string, VkAccelerationStructureBuildType
 extern const std::vector<std::pair<std::string, VkAccelerationStructureCompatibilityKHR>> AccelerationStructureCompatibilityKHR_map;
 extern const std::vector<std::pair<std::string, VkAccelerationStructureCreateFlagBitsKHR>> AccelerationStructureCreateFlagBitsKHR_map;
 extern const std::vector<std::pair<std::string, VkShaderGroupShaderKHR>> ShaderGroupShaderKHR_map;
-#endif /* A35B3A46_E1FF_4F3E_A823_A233A8C2305F */

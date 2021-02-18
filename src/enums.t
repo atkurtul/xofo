@@ -1,9 +1,14 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 use feature qw(say);
 
+if ("$ENV{VULKAN_SDK}") {
+  $vkpath = "$ENV{VULKAN_SDK}/include/vulkan/vulkan_core.h";
+} else {
+  $vkpath = "/usr/include/vulkan/vulkan_core.h";
+}
 
-open $fh, "<", "/usr/include/vulkan/vulkan_core.h" or die $!;
+open $fh, "<", $vkpath or die $!;
 
 
 while($line = <$fh>) {

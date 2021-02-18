@@ -1,4 +1,3 @@
-#define VMA_IMPLEMENTATION
 #include <xofo.h>
 
 #include <GLFW/glfw3.h>
@@ -119,7 +118,9 @@ struct {
     depth_buffer =
         Image::mk(VK_FORMAT_D32_SFLOAT, Image::DepthStencil | Image::Transient,
                   extent, 1, Image::Type::DepthBuffer);
-
+    
+    cout << "In here\n";
+    
     VkAttachmentDescription desc[2] = {
         {
             .format = fmt.format,
@@ -407,28 +408,6 @@ void xofo::draw(function<void(VkCommandBuffer)> const& f,
   // imgui
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
-
-  if (0 & ImGui::BeginMainMenuBar()) {
-    if (ImGui::BeginMenu("File")) {
-      ShowExampleMenuFile();
-      ImGui::EndMenu();
-    }
-    if (ImGui::BeginMenu("Edit")) {
-      if (ImGui::MenuItem("Undo", "CTRL+Z")) {
-      }
-      if (ImGui::MenuItem("Redo", "CTRL+Y", false, false)) {
-      }  // Disabled item
-      ImGui::Separator();
-      if (ImGui::MenuItem("Cut", "CTRL+X")) {
-      }
-      if (ImGui::MenuItem("Copy", "CTRL+C")) {
-      }
-      if (ImGui::MenuItem("Paste", "CTRL+V")) {
-      }
-      ImGui::EndMenu();
-    }
-    ImGui::EndMainMenuBar();
-  }
 
   imgui();
 
@@ -724,7 +703,7 @@ void xofo::at_exit(const std::function<void()>& f) {
   g_destructors.push_back(f);
 }
 
-VkSampler xofo::create_sampler(VkSamplerAddressMode mode, uint mip) {
+VkSampler xofo::create_sampler(VkSamplerAddressMode mode, u32 mip) {
   u64 key = ((u64)mode << 32) | mip;
   auto existing = g_samplers.find(key);
   if (existing != g_samplers.end())

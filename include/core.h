@@ -1,9 +1,6 @@
 #ifndef E7CD5CCF_D975_419F_81AE_1FAAB38BA0F3
 #define E7CD5CCF_D975_419F_81AE_1FAAB38BA0F3
 
-#include <cmath>
-#include <cstdlib>
-#include <cstring>
 #include <fstream>
 #include <functional>
 #include <iostream>
@@ -13,6 +10,7 @@
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
+#include <chrono>
 
 #include "typedefs.h"
 #include "vk_mem_alloc.h"
@@ -20,12 +18,15 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 
+
+
+using Clock = std::chrono::high_resolution_clock;
+
 template <class T>
 using Box = std::unique_ptr<T>;
 template <class T>
 using Rc = std::shared_ptr<T>;
-template <class T>
-using Opt = std::optional<T>;
+
 
 const char* vk_result_string(VkResult re);
 const char* desc_type_string(VkDescriptorType ty);
@@ -73,7 +74,7 @@ vec2 mouse_delta();
 vec2 mouse_norm();
 vec2 mouse_pos();
 
-VkSampler create_sampler(VkSamplerAddressMode mode, uint mip);
+VkSampler create_sampler(VkSamplerAddressMode mode, u32 mip);
 
 static struct VulkanProxy {
   operator VkInstance();
@@ -139,7 +140,7 @@ enum class Key {
   TAB = 258,
   BACKSPACE = 259,
   INSERT = 260,
-  DELETE = 261,
+  // DELETE = 261,
   RIGHT = 262,
   LEFT = 263,
   DOWN = 264,

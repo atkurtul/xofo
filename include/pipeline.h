@@ -5,6 +5,29 @@
 
 #include "maps.h"
 
+  
+template <class V>
+bool imgui_combo(const char* mode_name,
+                 std::vector<std::pair<std::string, V>> const& map,
+                 u32& selected) {
+  bool re = false;
+  if (ImGui::BeginCombo(mode_name, map[selected].first.data())) {
+    u32 i = 0;
+    for (auto& [k, v] : map) {
+      bool is_selected = i == selected;
+      if (ImGui::Selectable(map[i].first.data(), is_selected)) {
+        selected = i;
+        re = true;
+      }
+      if (is_selected)
+        ImGui::SetItemDefaultFocus();
+      i++;
+    }
+    ImGui::EndCombo();
+  }
+  return re;
+}
+
 namespace xofo {
 
 struct Shader {

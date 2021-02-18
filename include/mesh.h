@@ -20,8 +20,8 @@ struct Mesh {
   u32 mat;
 
   void show() {
-    ImGui::Text("Number of vertices: %lu", vertices);
-    ImGui::Text("Number of indices: %lu", indices);
+    ImGui::Text("Number of vertices: %llu", vertices);
+    ImGui::Text("Number of indices: %llu", indices);
     ImGui::Text("Material index %u", mat);
   }
 };

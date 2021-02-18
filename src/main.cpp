@@ -1,14 +1,19 @@
+#include "imgui.h"
 #include <xofo.h>
 
 
 using namespace std;
 using namespace xofo;
 
-int main() {
-  xofo::init();
-  auto pipeline = Pipeline::mk("shaders/shader");
-  auto skybox = Pipeline::mk("shaders/skybox", PipelineState{.depth_write = 0});
 
+int main() {
+  cout << "In main\n";
+  xofo::init();
+  cout << "Xofo inited\n";
+  auto pipeline = Pipeline::mk("shaders/shader");
+
+  auto skybox = Pipeline::mk("shaders/skybox", PipelineState{.depth_write = 0});
+  cout << "Pipes inited\n";
   CubeMap cube_map(*skybox);
 
   auto grid_pipe = Pipeline::mk(
@@ -18,10 +23,13 @@ int main() {
 
   auto uniform =
       xofo::Buffer::mk(65536, xofo::Buffer::Uniform, xofo::Buffer::Mapped);
-
+  cout << "Loading models\n";
+  auto t0 = Clock::now();
   Model model0("models/sponza/sponza.gltf", *pipeline);
-  Model model1("models/doom/0.obj", *pipeline);
+  // Model model1("models/doom/0.obj", *pipeline);
   Model model2("models/batman/0.obj", *pipeline);
+  auto t1 = Clock::now();
+  cout << "Loaded models in: "<< chrono::duration_cast<chrono::milliseconds>(t1-t0).count() << "\n";
   // Model model3("models/heavy_assault_rifle/scene.gltf", *pipeline);
   // model0.scale = 0.1;
 
@@ -49,6 +57,8 @@ int main() {
   }
 
   f32 speed = 1.f;
+
+  cout << "Before loop\n";
   while (xofo::poll()) {
     f64 dt = xofo::dt();
     auto mdelta = mouse_delta() * -0.0012f;
@@ -82,8 +92,8 @@ int main() {
           pipeline->bind_set([&](auto set) { uniform->bind_to_set(set, 0); },
                              {uniform.get()});
 
-          model0.draw(*pipeline, mat(0.1));
-          model1.draw(*pipeline, mat(1));
+          // model0.draw(*pipeline, mat(0.1));
+          // model1.draw(*pipeline, mat(1));
           model2.draw(*pipeline, mat(1));
 
           grid_pipe->bind();
@@ -92,20 +102,21 @@ int main() {
         },
         [&]() {
           using namespace ImGui;
-          BeginMainMenuBar();
+          ImGui::BeginMainMenuBar();
           {
-            if (BeginMenu("File")) {
-              void ShowExampleMenuFile();
-              ShowExampleMenuFile();
-              EndMenu();
+            if (ImGui::BeginMenu("File")) {
+              // void ShowExampleMenuFile();
+              // ShowExampleMenuFile();
+              ImGui::EndMenu();
             }
           }
+          ImGui::EndMainMenuBar();
 
           for (auto pipe : Pipeline::pipelines) {
             pipe->show();
           }
 
-          model1.show();
+          model2.show();
         });
   }
   CHECKRE(vkDeviceWaitIdle(xofo::vk));
