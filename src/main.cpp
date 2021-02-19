@@ -1,6 +1,8 @@
 #include <xofo.h>
 #include "imgui.h"
 
+
+
 using namespace std;
 using namespace xofo;
 
@@ -9,7 +11,7 @@ int main() {
   xofo::init();
   cout << "Xofo inited\n";
   auto pipeline = Pipeline::mk("shaders/shader");
-
+  
   auto skybox = Pipeline::mk("shaders/skybox", PipelineState{.depth_write = 0});
   cout << "Pipes inited\n";
   CubeMap cube_map(*skybox);
@@ -34,6 +36,9 @@ int main() {
 
   // Model model0("models/Package/AncientTemple.obj", *pipeline);
 
+  cout << model0.box.min << model0.box.max << "\n";
+  cout << model1.box.min << model1.box.max << "\n";
+  cout << model2.box.min << model2.box.max << "\n";
   xofo::Camera cam(1600, 900);
 
   xofo::register_recreation_callback(

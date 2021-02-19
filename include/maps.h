@@ -1,3 +1,5 @@
+#ifndef D7955436_2D81_401C_94C3_726123FC819F
+#define D7955436_2D81_401C_94C3_726123FC819F
 #include <core.h>
 extern const std::vector<std::pair<std::string, VkResult>> Result_map;
 extern const std::vector<std::pair<std::string, VkStructureType>> StructureType_map;
@@ -175,3 +177,4 @@ extern const std::vector<std::pair<std::string, VkAccelerationStructureBuildType
 extern const std::vector<std::pair<std::string, VkAccelerationStructureCompatibilityKHR>> AccelerationStructureCompatibilityKHR_map;
 extern const std::vector<std::pair<std::string, VkAccelerationStructureCreateFlagBitsKHR>> AccelerationStructureCreateFlagBitsKHR_map;
 extern const std::vector<std::pair<std::string, VkShaderGroupShaderKHR>> ShaderGroupShaderKHR_map;
+#endif /* D7955436_2D81_401C_94C3_726123FC819F */

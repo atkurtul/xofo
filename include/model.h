@@ -14,8 +14,8 @@ struct Model {
   std::vector<Mesh> meshes;
   std::vector<Material> mats;
   std::vector<VkDescriptorSet> sets;
-
   Rc<Buffer> buffer;
+
   vec3 pos;
   f32 scale;
   Bbox box;

@@ -8,8 +8,8 @@
 namespace xofo {
 
 struct Bbox {
-  vec3 min = vec3(-INFINITY);
-  vec3 max = vec3(+INFINITY);
+  vec3 min = vec3(+INFINITY);
+  vec3 max = vec3(-INFINITY);
 };
 
 struct Mesh {

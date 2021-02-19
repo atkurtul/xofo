@@ -64,6 +64,8 @@ struct Buffer : ShaderResource {
 
   static Box<Buffer> mk(u64 size, VkBufferUsageFlags usage, Mapping);
 
+  static Box<Buffer> unmapped(std::vector<std::pair<u64, u8*>> raws, VkBufferUsageFlags usage = Buffer::Vertex | Buffer::Index);
+  
  protected:
   Buffer(u64 size, VkBufferUsageFlags usage, Mapping);
 };

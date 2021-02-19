@@ -1,6 +1,7 @@
 #ifndef A85441C4_7ECF_4EE1_8160_B7BEA0D5A239
 #define A85441C4_7ECF_4EE1_8160_B7BEA0D5A239
 
+#include <mango/math/vector.hpp>
 #include <stdint.h>
 
 #include <mango/math/matrix_float4x4.hpp>
@@ -9,6 +10,9 @@
 #include <mango/math/geometry.hpp>
 
 #include <mango/image/surface.hpp>
+
+#include <iostream>
+
 
 #define RADIAN 0.01745329251f
 
@@ -40,5 +44,15 @@ typedef uint32_t u32;
 typedef uint64_t u64;
 typedef float f32;
 typedef double f64;
+
+
+#include <iomanip>
+
+template<class T, int n>
+inline std::ostream& operator << (std::ostream& stream, mango::Vector<T, n> const& v) {
+  for(int i = 0; i < n; ++i)
+    stream << std::setw(5) << v[i];
+  return stream << "\n";
+}
 
 #endif /* A85441C4_7ECF_4EE1_8160_B7BEA0D5A239 */

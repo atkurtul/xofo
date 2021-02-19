@@ -1,3 +1,4 @@
+#include "core.h"
 #include <xofo.h>
 
 using namespace xofo;
@@ -31,4 +32,29 @@ Buffer::Buffer(u64 size, VkBufferUsageFlags usage, Mapping map) {
 
 Box<Buffer> Buffer::mk(u64 size, VkBufferUsageFlags usage, Mapping map) {
   return Box<Buffer>(new Buffer(size, usage, map));
+}
+
+
+Box<Buffer> Buffer::unmapped(std::vector<std::pair<u64, u8*>> raws, VkBufferUsageFlags usage) {
+
+  u64 total = 0;
+  for(auto [s, _] : raws) total += s;
+  
+  auto buffer = Buffer::mk(total, usage, Buffer::Unmapped);
+
+  auto staging = Buffer::mk(total, Buffer::Src, Buffer::Mapped);
+
+  u64 offset = 0;
+
+  for(auto [size, data] : raws) {
+    memcpy(staging->mapping + offset, data, size);
+    offset += size;
+  }
+
+  xofo::execute([&](auto cmd) {
+      VkBufferCopy reg = {0, 0, total};
+      vkCmdCopyBuffer(cmd, *staging, *buffer, 1, &reg);
+  });
+
+  return buffer;
 }

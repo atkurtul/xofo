@@ -16,6 +16,8 @@ find_package(Vulkan REQUIRED)
 find_package(ASSIMP REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(mango REQUIRED)
+find_package(Bullet REQUIRED)
+
 
 file(GLOB imgui_src ${CMAKE_CURRENT_SOURCE_DIR}/lib/imgui/*.cpp)
 add_library(imgui ${imgui_src})
@@ -32,6 +34,7 @@ target_link_directories(xofo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lib)
 
 
 target_link_libraries(xofo ${Vulkan_LIBRARIES})
+target_link_libraries(xofo ${BULLET_LIBRARIES})
 target_link_libraries(xofo ${mango_LIBRARIES})
 target_link_libraries(xofo ${ASSIMP_LIBRARIES})
 target_link_libraries(xofo glfw)
@@ -45,3 +48,4 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${mango_INCLUDE_DIRS})
 include_directories(${Vulkan_INCLUDE_DIRS})
 include_directories(${assimp_INCLUDE_DIRS})
+include_directories(${BULLET_INCLUDE_DIRS})
