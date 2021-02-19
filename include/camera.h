@@ -1,6 +1,7 @@
 #ifndef B3B03750_263B_4E66_AC1D_8B942729270C
 #define B3B03750_263B_4E66_AC1D_8B942729270C
 
+#include "core.h"
 #include "typedefs.h"
 
 namespace xofo {
@@ -10,7 +11,9 @@ struct Camera {
   mat ori;
   vec4 pos;
   mat view;
-  Camera(f32 x, f32 y) : ori(1), pos(0, 0, 0, 1) { set_prj(x, y); }
+  vec4 mouse_ray;
+  Camera(f32 x, f32 y) : ori(1), pos(0, 0, 0, 1), mouse_ray(0, 0, 1, 0) { set_prj(x, y); }
+
 
   void set_prj(f32 x, f32 y) {
     f32 fov = 90 * RADIAN;
@@ -25,6 +28,9 @@ struct Camera {
     view = transpose(ori);
     view[3] = -pos * view;
     view[3].w = 1;
+
+    mouse_ray = mango::normalize(vec4(mouse_norm() / vec2(prj[0][0], prj[1][1]), -1, 0) * ori);
+
   }
 
   vec4 right() const { return ori[0]; }

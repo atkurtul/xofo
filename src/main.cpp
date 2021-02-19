@@ -1,44 +1,50 @@
 #include <xofo.h>
 #include "imgui.h"
 
-
-
 using namespace std;
 using namespace xofo;
 
+void draw_vec4(const char* name, vec4 v) {
+  ImGui::Text("%s %5f %5f %5f %5f", name, (f32)v.x, (f32)v.y, (f32)v.z,
+              (f32)v.w);
+}
+
+struct Xform {
+  mat xform;
+  vec3 vel;
+
+  Xform(vec3 pos, vec3 vel) : xform(0.1), vel(vel) { xform.translate(pos); }
+
+  mat const& integrate(f32 dt) {
+    xform.translate(vel * dt);
+    return xform;
+  }
+};
+
 int main() {
-  cout << "In main\n";
   xofo::init();
-  cout << "Xofo inited\n";
+
   auto pipeline = Pipeline::mk("shaders/shader");
-  
+
   auto skybox = Pipeline::mk("shaders/skybox", PipelineState{.depth_write = 0});
-  cout << "Pipes inited\n";
+
   CubeMap cube_map(*skybox);
+
+  Model cube("models/cube.gltf", *pipeline);
+
+  vector<Xform> xforms;
 
   auto grid_pipe = Pipeline::mk(
       "shaders/grid", PipelineState{.polygon = VK_POLYGON_MODE_LINE,
                                     .topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST,
                                     .line_width = 1.2f});
 
-  auto uniform =
-      xofo::Buffer::mk(65536, xofo::Buffer::Uniform, xofo::Buffer::Mapped);
-  cout << "Loading models\n";
-  auto t0 = Clock::now();
+  auto uniform = Buffer::mk(65536, Buffer::Uniform, Buffer::Mapped);
+
   Model model0("models/sponza/sponza.gltf", *pipeline);
   Model model1("models/doom/0.obj", *pipeline);
   Model model2("models/batman/0.obj", *pipeline);
-  auto t1 = Clock::now();
-  cout << "Loaded models in: "
-       << chrono::duration_cast<chrono::milliseconds>(t1 - t0).count() << "\n";
-  // Model model3("models/heavy_assault_rifle/scene.gltf", *pipeline);
-  // model0.scale = 0.1;
 
-  // Model model0("models/Package/AncientTemple.obj", *pipeline);
-
-  cout << model0.box.min << model0.box.max << "\n";
-  cout << model1.box.min << model1.box.max << "\n";
-  cout << model2.box.min << model2.box.max << "\n";
   xofo::Camera cam(1600, 900);
 
   xofo::register_recreation_callback(
@@ -62,7 +68,6 @@ int main() {
 
   f32 speed = 1.f;
 
-  cout << "Before loop\n";
   while (xofo::poll()) {
     f64 dt = xofo::dt();
     auto mdelta = mouse_delta() * -0.0012f;
@@ -81,6 +86,14 @@ int main() {
     cam.update(mdelta, s - w, d - a, dt * 5 * speed);
 
     uniform->copy(cam.pos);
+    {
+      static float timer = 0;
+      if ((timer += dt) > 0.2 && mbutton(0)) {
+        timer = 0;
+        xforms.emplace_back(cam.pos.xyz, cam.mouse_ray.xyz);
+        //xforms.emplace_back(cam.pos.xyz, -cam.ori[2].xyz);
+      }
+    }
 
     xofo::draw(
         [&](auto) {
@@ -100,6 +113,10 @@ int main() {
           model1.draw(*pipeline, mat(1));
           model2.draw(*pipeline, mat(1));
 
+          for (auto& xform : xforms) {
+            cube.draw(*pipeline, xform.integrate(10 * dt));
+          }
+
           grid_pipe->bind();
           grid_buffer->bind_vertex();
           vkCmdDraw(vk, 8004, 1, 0, 0);
@@ -114,13 +131,16 @@ int main() {
                 timer = 0, dtt = 1.f / dt;
               ImGui::Text("%f\n", dtt);
             }
-            
+
             if (ImGui::BeginMenu("File")) {
-              // void ShowExampleMenuFile();
-              // ShowExampleMenuFile();
               ImGui::EndMenu();
             }
           }
+
+          ImGui::Begin("Dirs");
+          draw_vec4("Mouse ray", cam.mouse_ray);
+          draw_vec4("Forward", cam.ori[2]);
+          ImGui::End();
 
           ImGui::EndMainMenuBar();
 
