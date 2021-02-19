@@ -4,7 +4,7 @@
 generator=""
 
 if [ $(uname) == "Linux" ]; then
-  if [ -x $(command -v discord) ]; then
+  if [ -x $(command -v ninja) ]; then
     generator="-G Ninja"
   fi
 fi
