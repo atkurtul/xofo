@@ -1,5 +1,7 @@
 #include <xofo.h>
 
+#include <mango/image/surface.hpp>
+
 using namespace std;
 using namespace xofo;
 
@@ -251,12 +253,12 @@ void generate_mips(VkCommandBuffer cmd,
             },
     };
 
-    image_blit.srcOffsets[1] = {.x = (i32)max((extent.width >> (i - 1)), 1u),
-                                .y = (i32)max((extent.height >> (i - 1)), 1u),
+    image_blit.srcOffsets[1] = {.x = (i32)xofo::max((extent.width >> (i - 1)), 1u),
+                                .y = (i32)xofo::max((extent.height >> (i - 1)), 1u),
                                 .z = 1};
     image_blit.dstOffsets[1] = {
-        .x = (i32)max((extent.width >> i), 1u),
-        .y = (i32)max((extent.height >> i), 1u),
+        .x = (i32)xofo::max((extent.width >> i), 1u),
+        .y = (i32)xofo::max((extent.height >> i), 1u),
         .z = 1,
     };
 
@@ -407,7 +409,7 @@ Box<Texture> Texture::load_cubemap_6_files_from_folder(string folder, VkFormat f
   return Box<Texture>(texture);
 }
 
-void bmap_copy_rect(u8* buffer, mango::Bitmap& img, vec2i lo, vec2i hi) {
+void bmap_copy_rect(u8* buffer, mango::Bitmap& img, i32x2 lo, i32x2 hi) {
   u32 offset = img.stride * lo.y + lo.x * 4;
   u32 strip = hi.x - lo.x;
   for (u32 i = 0; i < hi.y - lo.y; ++i) {
@@ -444,27 +446,27 @@ Box<Texture> Texture::load_cubemap_single_file(string file, VkFormat format) {
   i32 negz = 4;
   // posx - [2-3]/4 mid
   bmap_copy_rect(staging->mapping + size * posx, bitmap,
-                 vec2i(width * 2, height * 1), vec2i(width * 3, height * 2));
+                 i32x2(width * 2, height * 1), i32x2(width * 3, height * 2));
 
   // negx - [0-1]/4 mid
   bmap_copy_rect(staging->mapping + size * negx, bitmap,
-                 vec2i(width * 0, height * 1), vec2i(width * 1, height * 2));
+                 i32x2(width * 0, height * 1), i32x2(width * 1, height * 2));
 
   // posy - [1-2]/4 top
   bmap_copy_rect(staging->mapping + size * posy, bitmap,
-                 vec2i(width * 1, height * 0), vec2i(width * 2, height * 1));
+                 i32x2(width * 1, height * 0), i32x2(width * 2, height * 1));
 
   // negy - [1-2]/4 bot
   bmap_copy_rect(staging->mapping + size * negy, bitmap,
-                 vec2i(width * 1, height * 2), vec2i(width * 2, height * 3));
+                 i32x2(width * 1, height * 2), i32x2(width * 2, height * 3));
 
   // posz - [3-4]/4 mid
   bmap_copy_rect(staging->mapping + size * posz, bitmap,
-                 vec2i(width * 3, height * 1), vec2i(width * 4, height * 2));
+                 i32x2(width * 3, height * 1), i32x2(width * 4, height * 2));
 
   // negz - [1-2]/4 mid
   bmap_copy_rect(staging->mapping + size * negz, bitmap,
-                 vec2i(width * 1, height * 1), vec2i(width * 2, height * 2));
+                 i32x2(width * 1, height * 1), i32x2(width * 2, height * 2));
 
   // Create optimal tiled target image
   VkImageCreateInfo image_info = {

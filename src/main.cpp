@@ -4,21 +4,18 @@
 using namespace std;
 using namespace xofo;
 
-void draw_vec4(const char* name, vec4 v) {
+void draw_f32x4(const char* name, f32x4 v) {
   ImGui::Text("%s %5f %5f %5f %5f", name, (f32)v.x, (f32)v.y, (f32)v.z,
               (f32)v.w);
 }
 
 struct Xform {
-  mat xform;
-  vec3 vel;
+  f32x4x4 xform;
+  f32x3 vel;
 
-  Xform(vec3 pos, vec3 vel) : xform(0.1), vel(vel) { xform.translate(pos); }
+  Xform(f32x3 pos, f32x3 vel) : xform(translate(f32x4x4(0.1), pos)), vel(vel) {}
 
-  mat const& integrate(f32 dt) {
-    xform.translate(vel * dt);
-    return xform;
-  }
+  f32x4x4 const& integrate(f32 dt) { return xform = translate(xform, vel * dt); }
 };
 
 int main() {
@@ -50,20 +47,20 @@ int main() {
   xofo::register_recreation_callback(
       [&](auto extent) { cam.set_prj(extent.width, extent.height); });
 
-  mat m3(0.1);
-  vec4 ax(0, 0, 0, 1);
-  vec3 xxf(0);
+  auto m3 = scale<f32,4>(1);
+  f32x4 ax(0, 0, 0, 1);
+  f32x3 xxf(0);
 
   auto grid_buffer = Buffer::mk(65536, Buffer::Vertex, Buffer::Mapped);
   for (u32 i = 0; i <= 2000; ++i) {
-    vec2* verts = (vec2*)grid_buffer->mapping;
+    f32x2* verts = (f32x2*)grid_buffer->mapping;
     i32 half = 1000;
     f32 x = (f32)i - half;
 
-    verts[i * 4 + 0] = vec2(x, half);
-    verts[i * 4 + 1] = vec2(x, -half);
-    verts[i * 4 + 2] = vec2(half, x);
-    verts[i * 4 + 3] = vec2(-half, x);
+    verts[i * 4 + 0] = f32x2(x, half);
+    verts[i * 4 + 1] = f32x2(x, -half);
+    verts[i * 4 + 2] = f32x2(half, x);
+    verts[i * 4 + 3] = f32x2(-half, x);
   }
 
   f32 speed = 1.f;
@@ -91,7 +88,7 @@ int main() {
       if ((timer += dt) > 0.2 && mbutton(0)) {
         timer = 0;
         xforms.emplace_back(cam.pos.xyz, cam.mouse_ray.xyz);
-        //xforms.emplace_back(cam.pos.xyz, -cam.ori[2].xyz);
+        // xforms.emplace_back(cam.pos.xyz, -cam.ori[2].xyz);
       }
     }
 
@@ -101,17 +98,15 @@ int main() {
           skybox->push(cam.view);
           skybox->push(cam.prj, 64);
 
-          auto id = mat(1);
-          id.translate(cam.pos.xyz);
-          cube_map.draw(*skybox, id);
+          cube_map.draw(*skybox, translate(f32x4x4(1), f32x3(cam.pos.xyz)));
 
           pipeline->bind();
           pipeline->bind_set([&](auto set) { uniform->bind_to_set(set, 0); },
                              {uniform.get()});
 
-          model0.draw(*pipeline, mat(0.1));
-          model1.draw(*pipeline, mat(1));
-          model2.draw(*pipeline, mat(1));
+          model0.draw(*pipeline, scale<f32,4>(0.1));
+          model1.draw(*pipeline, f32x4x4(1));
+          model2.draw(*pipeline, f32x4x4(1));
 
           for (auto& xform : xforms) {
             cube.draw(*pipeline, xform.integrate(10 * dt));
@@ -138,8 +133,9 @@ int main() {
           }
 
           ImGui::Begin("Dirs");
-          draw_vec4("Mouse ray", cam.mouse_ray);
-          draw_vec4("Forward", cam.ori[2]);
+          draw_f32x4("Mouse ray", cam.mouse_ray);
+          draw_f32x4("Forward", cam.ori[2]);
+          draw_f32x4("Pos", cam.pos);
           ImGui::End();
 
           ImGui::EndMainMenuBar();

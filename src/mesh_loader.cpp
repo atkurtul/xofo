@@ -61,9 +61,9 @@ Bbox MeshLoader::load_geometry(u8* buffer) {
     for (u32 j = 0; j < mesh->mNumVertices; ++j) {
 
       memcpy(buffer, mesh->mVertices + j, 12);
-      vec3 pos = *(vec3*)(mesh->mVertices + j);
-      box.min = mango::min(pos, box.min);
-      box.max = mango::max(pos, box.max);
+      f32x3 pos = *(f32x3*)(mesh->mVertices + j);
+      box.min = xofo::min(pos, box.min);
+      box.max = xofo::max(pos, box.max);
 
       if (tex && mesh->mTextureCoords[0])
         memcpy(buffer + tex, &mesh->mTextureCoords[0][j], 8);
@@ -112,7 +112,7 @@ std::vector<Material> MeshLoader::load_materials() {
 
     aiColor3D color;
     if (aiReturn_SUCCESS == mat->Get(AI_MATKEY_COLOR_DIFFUSE, color)) {
-      mmat.color = vec3{color.r, color.g, color.b};
+      mmat.color = f32x3(color.r, color.g, color.b);
     }
 
     if (aiReturn_SUCCESS == mat->GetTexture(aiTextureType_DIFFUSE, 0, &path)) {

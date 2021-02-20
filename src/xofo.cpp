@@ -16,14 +16,14 @@ static VkQueue g_queue;
 static VmaAllocator g_allocator;
 static struct GLFWwindow* g_glfw;
 static VkSurfaceKHR g_surface;
-static vec4 g_color = vec4{0.2, 0.2, 0.2, 1};
+static f32x4 g_color = f32x4(0.2, 0.2, 0.2, 1);
 static vector<function<void(VkExtent2D)>> g_callbacks;
 static vector<function<void()>> g_destructors;
 static unordered_map<u64, VkSampler> g_samplers;
 
-static vec2 g_mpos;
-static vec2 g_mdelta;
-static vec2 g_mnorm;
+static f32x2 g_mpos;
+static f32x2 g_mdelta;
+static f32x2 g_mnorm;
 static i32 g_scroll_wheel;
 static f64 g_time = 0;
 static f64 g_dt = 0;
@@ -535,11 +535,11 @@ int xofo::poll() {
   {
     f64 x, y;
     glfwGetCursorPos(g_glfw, &x, &y);
-    vec2 curr = vec2{(f32)x, (f32)y};
+    f32x2 curr = f32x2{(f32)x, (f32)y};
     g_mdelta = curr - g_mpos;
     g_mpos = curr;
     g_mnorm =
-        curr / vec2{(f32)g_res.extent.width, (f32)g_res.extent.height} * 2.f -
+        curr / f32x2{(f32)g_res.extent.width, (f32)g_res.extent.height} * 2.f -
         1.f;
   }
 
@@ -555,15 +555,15 @@ f64 xofo::dt() {
   return g_dt;
 }
 
-vec2 xofo::mouse_delta() {
+f32x2 xofo::mouse_delta() {
   return g_mdelta;
 }
 
-vec2 xofo::mouse_norm() {
+f32x2 xofo::mouse_norm() {
   return g_mnorm;
 }
 
-vec2 xofo::mouse_pos() {
+f32x2 xofo::mouse_pos() {
   return g_mpos;
 }
 

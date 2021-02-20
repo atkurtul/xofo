@@ -16,15 +16,15 @@ struct Cube {
 
   Cube(Bbox box) : scale(box) {
     if (!buffer) {
-      vec3 vertices[] = {
-          vec3(-1, -1, -1),  // 0
-          vec3(+1, -1, -1),  // 1
-          vec3(+1, +1, -1),  // 2
-          vec3(-1, +1, -1),  // 3
-          vec3(-1, -1, +1),  // 4
-          vec3(+1, -1, +1),  // 5
-          vec3(+1, +1, +1),  // 6
-          vec3(-1, +1, +1),  // 7
+      f32x3 vertices[] = {
+          f32x3(-1, -1, -1),  // 0
+          f32x3(+1, -1, -1),  // 1
+          f32x3(+1, +1, -1),  // 2
+          f32x3(-1, +1, -1),  // 3
+          f32x3(-1, -1, +1),  // 4
+          f32x3(+1, -1, +1),  // 5
+          f32x3(+1, +1, +1),  // 6
+          f32x3(-1, +1, +1),  // 7
       };
       u32 indices[36] = {0, 2, 1, 0, 3, 2, 1, 2, 6, 6, 5, 1, 4, 5, 6, 6, 7, 4,
                          2, 3, 6, 6, 3, 7, 0, 7, 3, 0, 4, 7, 0, 1, 5, 0, 5, 4};
@@ -37,7 +37,7 @@ struct Cube {
     }
   }
 
-  void draw(Pipeline& pipeline, mat mat, VkCommandBuffer cmd = vk){
+  void draw(Pipeline& pipeline, f32x4 mat, VkCommandBuffer cmd = vk){
     pipeline.push(mat, 128);
     // for (auto& mesh : meshes) {
     //   pipeline.bind_set(

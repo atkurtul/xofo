@@ -16,7 +16,7 @@ struct Model {
   std::vector<VkDescriptorSet> sets;
   Rc<Buffer> buffer;
 
-  vec3 pos;
+  f32x3 pos;
   f32 scale;
   Bbox box;
 
@@ -41,7 +41,7 @@ struct Model {
     });
   }
 
-  void draw(Pipeline& pipeline, mat mat, VkCommandBuffer cmd = vk) {
+  void draw(Pipeline& pipeline, f32x4x4 mat, VkCommandBuffer cmd = vk) {
     pipeline.push(mat, 128);
     for (auto& mesh : meshes) {
       pipeline.bind_set(

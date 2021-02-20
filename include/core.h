@@ -19,7 +19,6 @@
 #include <imgui_internal.h>
 
 
-
 using Clock = std::chrono::high_resolution_clock;
 
 template <class T>
@@ -70,9 +69,9 @@ void hide_mouse(bool state);
 i32 poll();
 f64 dt();
 f64 aspect_ratio();
-vec2 mouse_delta();
-vec2 mouse_norm();
-vec2 mouse_pos();
+f32x2 mouse_delta();
+f32x2 mouse_norm();
+f32x2 mouse_pos();
 
 VkSampler create_sampler(VkSamplerAddressMode mode, u32 mip);
 

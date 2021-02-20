@@ -8,8 +8,8 @@
 namespace xofo {
 
 struct Bbox {
-  vec3 min = vec3(+INFINITY);
-  vec3 max = vec3(-INFINITY);
+  f32x3 min = f32x3(+INFINITY);
+  f32x3 max = f32x3(-INFINITY);
 };
 
 struct Mesh {
@@ -30,7 +30,7 @@ struct Material {
   Rc<Texture> diffuse;
   Rc<Texture> normal;
   Rc<Texture> metallic;
-  vec3 color;
+  f32x3 color;
 
   Material() {
     static u8 black[4] = {0, 0, 0, 255};

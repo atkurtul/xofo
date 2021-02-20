@@ -42,7 +42,7 @@ struct CubeMap {
     // texture->bind_to_set(set, 0);
   };
 
-  void draw(Pipeline& pipeline, mat mat, VkCommandBuffer cmd = vk) {
+  void draw(Pipeline& pipeline, f32x4x4 mat, VkCommandBuffer cmd = vk) {
     pipeline.push(mat, 128);
     pipeline.bind_set([&](auto set) { texture->bind_to_set(set, 0); },
                       {texture.get()}, 0, cmd);
