@@ -172,12 +172,6 @@ requires((n < m) && ...) struct swizz {
   INLINE auto norm() const { return norm(*this); }
   INLINE auto len() const { return len(*this); }
 
-  template <u32 lenr, u32... nr>
-  requires(sizeof...(n) == 3 && sizeof...(nr) == 3)
-      vector_base<T, 3> cross(swizz<lenr, T, nr...> r) const {
-    return vect(*this).cross(vect(r));
-  }
-
  private:
   static constexpr u32 idx[] = {n...};
   T v[m];
@@ -249,10 +243,6 @@ struct __attribute__((aligned(alignment<T, 3>()))) vector_base<T, 3> {
 
   INLINE auto norm() const { return norm(*this); }
   INLINE auto len() const { return len(*this); }
-
-  INLINE vector_base cross(vector_base r) const {
-    return yzx * r.zxy - zxy * r.yzx;
-  }
 };
 
 template <class T>
@@ -369,6 +359,11 @@ INLINE T max(T a, T b) {
   return a > b ? a : b;
 }
 
+template <class T>
+INLINE T abs(T a) {
+  return a < 0 ? -a : a;
+}
+
 template <class T, u32 n>
 INLINE vector_base<T, n> min(vector_base<T, n> l, vector_base<T, n> r) {
   return sequence<T, n>::foreach (l, r, min);
@@ -377,6 +372,11 @@ INLINE vector_base<T, n> min(vector_base<T, n> l, vector_base<T, n> r) {
 template <class T, u32 n>
 INLINE vector_base<T, n> max(vector_base<T, n> l, vector_base<T, n> r) {
   return sequence<T, n>::foreach (l, r, max);
+}
+
+template <class T, u32 n>
+INLINE vector_base<T, n> abs(vector_base<T, n> l) {
+  return sequence<T, n>::map(l, abs);
 }
 
 INLINE auto clamp(auto v, auto lo, auto hi) {
@@ -405,6 +405,7 @@ overload_binop(min, T);
 overload_binop(max, T);
 overload_unop(len, T);
 overload_unop(norm, T);
+overload_unop(abs, T);
 
 #undef overload_binop
 #undef overload_unop
@@ -470,8 +471,8 @@ struct matrix_base {
     for (u32 i = 0; i < min(R, C); ++i)
       data[i][i] = s;
 
-    if constexpr (R == 4 && C == 4) {
-      data[3][3] = T(1);
+    if constexpr (R == C) {
+      data[R - 1][C - 1] = T(1);
     }
   }
 
@@ -505,36 +506,48 @@ struct matrix_base {
   INLINE matrix_base<T, R, O> operator*(matrix_base<T, C, O> const& r) {
     return sequence::mul_mm(*this, r);
   }
-
-  INLINE matrix_base<T, C, R> transpose() const {
-    return matrix_base<T, C, R>::sequence::transpose(*this);
-  }
 };
 
-template <class T>
-INLINE T determinant(matrix_base<T, 2, 2> const& m) {
-  return m[0].cross(m[1]);
+template <class T, u32 R, u32 C>
+INLINE matrix_base<T, C, R> transpose(matrix_base<T, R, C> const& m) {
+  return matrix_base<T, C, R>::sequence::transpose(m);
 }
 
 template <class T>
-INLINE T triple_product(auto x, auto y, auto z) {
-  return dot(x, y.cross(z));
-  return dot(y, z.cross(x));
-  return dot(z, x.cross(y));
+INLINE vector_base<T, 3> cross(auto a, auto b) {
+  vector_base<T, 3> l = a;
+  vector_base<T, 3> r = b;
+  return l.yzx * r.zxy - l.zxy * r.yzx;
+}
+
+template <class T>
+INLINE T determinant(matrix_base<T, 2, 2> const& m) {
+  return cross(m[0], m[1]);
+}
+
+template <class T>
+INLINE T tproduct(auto x, auto y, auto z) {
+  return dot(x, cross<T>(y, z));
 }
 
 template <class T>
 INLINE T determinant(matrix_base<T, 3, 3> const& m) {
-  return triple_product(m[0], m[1], m[2]);
+  return tproduct(m[0], m[1], m[2]);
+}
+
+template <class T>
+INLINE vector_base<T, 4> cross(auto a, auto b, auto c) {
+  vector_base<T, 4> x = a;
+  vector_base<T, 4> y = b;
+  vector_base<T, 4> z = c;
+  return vector_base<T, 4>(
+      tproduct<T>(x.yzw, y.yzw, z.yzw), -tproduct<T>(x.xzw, y.xzw, z.xzw),
+      tproduct<T>(x.xyw, y.xyw, z.xyw), -tproduct<T>(x.xyz, y.xyz, z.xyz));
 }
 
 template <class T>
 INLINE T determinant(matrix_base<T, 4, 4> const& m) {
-  return dot(m[0], vector_base<T, 4>(
-                       +triple_product<T>(m[1].yzw, m[2].yzw, m[3].yzw),
-                       -triple_product<T>(m[1].xzw, m[2].xzw, m[3].xzw),
-                       +triple_product<T>(m[1].xyw, m[2].xyw, m[3].xyw),
-                       -triple_product<T>(m[1].xyz, m[2].xyz, m[3].xyz)));
+  return dot(m[0], cross(m[1], m[2], m[3]));
 }
 
 #define typedef_mat(r, c)                       \
@@ -565,14 +578,6 @@ typedef_matr(5);
 typedef_matr(6);
 typedef_matr(7);
 typedef_matr(8);
-
-
-template <class T, u32 N>
-INLINE matrix_base<T, N, N> scale(T s) {
-  auto re = matrix_base<T, N, N>(s);
-  re[N-1][N-1]= T(1);
-  return re;
-}
 
 template <class T>
 INLINE matrix_base<T, 4, 4> translate(matrix_base<T, 4, 4> const& m,
@@ -643,7 +648,7 @@ INLINE matrix_base<T, 4, 4> frustum(T left,
   using vec4 = vector_base<T, 4>;
 
   return matrix_base<T, 4, 4>(vec4(x, 0, 0, 0), vec4(0, y, 0, 0),
-                              vec4(a, b, c, c - 1.0f), vec4(0, 0, d, d));
+                              vec4(a, b, c, c - T(1)), vec4(0, 0, d, d));
 }
 
 template <class T>
@@ -688,6 +693,21 @@ INLINE matrix_base<T, 4, 4> perspective(T x, T y, T n, T f) {
 // INLINE f64x4x4 perspective(f64 x, f64 y, f64 n, f64 f) {
 //   return impl::perspective(x, y, n, f);
 // }
+
+template <class T>
+INLINE matrix_base<T, 4, 4> inverse(matrix_base<T, 4, 4> const& m) {
+  using mat4 = matrix_base<T, 4, 4>;
+
+  auto col0 = cross<T>(m[1], m[2], m[3]);
+
+  auto inv_det = T(1) / dot(m[0], col0);
+
+  auto col1 = -cross<T>(m[0], m[2], m[3]) * inv_det;
+  auto col2 =  cross<T>(m[0], m[1], m[3]) * inv_det;
+  auto col3 = -cross<T>(m[0], m[1], m[2]) * inv_det;
+
+  return transpose(matrix_base<T, 4, 4>(col0 * inv_det, col1, col2, col3));
+}
 
 #undef INLINE
 

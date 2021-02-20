@@ -40,7 +40,7 @@ Box<Buffer> Buffer::unmapped(std::vector<std::pair<u64, u8*>> raws, VkBufferUsag
   u64 total = 0;
   for(auto [s, _] : raws) total += s;
   
-  auto buffer = Buffer::mk(total, usage, Buffer::Unmapped);
+  auto buffer = Buffer::mk(total, usage | Buffer::Dst, Buffer::Unmapped);
 
   auto staging = Buffer::mk(total, Buffer::Src, Buffer::Mapped);
 

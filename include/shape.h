@@ -12,9 +12,8 @@ namespace xofo {
 struct Cube {
   inline static Buffer* buffer = 0;
   inline static constexpr u32 vertex_offset = 144;
-  Bbox scale;
 
-  Cube(Bbox box) : scale(box) {
+  Cube() {
     if (!buffer) {
       f32x3 vertices[] = {
           f32x3(-1, -1, -1),  // 0
@@ -37,26 +36,16 @@ struct Cube {
     }
   }
 
-  void draw(Pipeline& pipeline, f32x4 mat, VkCommandBuffer cmd = vk){
-    pipeline.push(mat, 128);
-    // for (auto& mesh : meshes) {
-    //   pipeline.bind_set(
-    //       [&](auto set) {
-    //         if (pipeline.has_binding(1, 2))
-    //           mats[mesh.mat].metallic->bind_to_set(set, 2);
-    //         if (pipeline.has_binding(1, 1))
-    //           mats[mesh.mat].normal->bind_to_set(set, 1);
-    //         if (pipeline.has_binding(1, 0))
-    //           mats[mesh.mat].diffuse->bind_to_set(set, 0);
-    //       },
-    //       {mats[mesh.mat].metallic.get(), mats[mesh.mat].normal.get(),
-    //        mats[mesh.mat].diffuse.get()},
-    //       1, cmd);
+  void draw(std::vector<f32x4x4> const& boxes, Pipeline& pipeline, VkCommandBuffer cmd = vk){
 
-    //   buffer->bind_vertex(mesh.vertex_offset);
-    //   buffer->bind_index(mesh.index_offset);
-    //   vkCmdDrawIndexed(cmd, mesh.indices >> 2, 1, 0, 0, 0);
-    // }
+    buffer->bind_vertex(vertex_offset);
+    buffer->bind_index();
+
+    for (auto& box : boxes) {
+      pipeline.push(box, 128);
+      vkCmdDrawIndexed(cmd, 36, 1, 0, 0, 0);
+    }
+
   }
 };
 

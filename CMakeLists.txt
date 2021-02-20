@@ -33,6 +33,7 @@ add_executable(xofo ${xofo_src})
 target_link_directories(xofo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lib)
 
 
+message("BULLET_LIBRARIES = ${BULLET_LIBRARIES}")
 target_link_libraries(xofo ${Vulkan_LIBRARIES})
 target_link_libraries(xofo ${BULLET_LIBRARIES})
 target_link_libraries(xofo ${mango_LIBRARIES})
