@@ -48,7 +48,7 @@ struct CubeMap {
                       {texture.get()}, 0, cmd);
 
     buffer->bind_vertex();
-    vkCmdBindIndexBuffer(cmd, *buffer, mesh.index_offset, VK_INDEX_TYPE_UINT32);
+    buffer->bind_index(mesh.index_offset);
     vkCmdDrawIndexed(cmd, mesh.indices >> 2, 1, 0, 0, 0);
   }
 };

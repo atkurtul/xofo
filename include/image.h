@@ -7,10 +7,17 @@ namespace xofo {
 struct Image : ShaderResource {
   VmaAllocation allocation;
   VkImage image;
-  VkImageView view;
-  VkSampler sampler;
   VkDescriptorType type;
-  VkImageLayout layout;
+
+  union {
+    struct {
+      VkSampler sampler;
+      VkImageView view;
+      VkImageLayout layout;
+    };
+    VkDescriptorImageInfo descriptor_info;
+  };
+
   u32 width, height;
   enum {
     Src = VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
@@ -48,19 +55,13 @@ struct Image : ShaderResource {
   ~Image();
 
   VkDescriptorSet bind_to_set(VkDescriptorSet set, u32 bind) {
-    VkDescriptorImageInfo info = {
-        .sampler = sampler,
-        .imageView = view,
-        .imageLayout = layout,
-    };
-
     VkWriteDescriptorSet write = {
         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
         .dstSet = set,
         .dstBinding = bind,
         .descriptorCount = 1,
         .descriptorType = type,
-        .pImageInfo = &info};
+        .pImageInfo = &descriptor_info};
 
     vkUpdateDescriptorSets(vk, 1, &write, 0, 0);
 
@@ -91,11 +92,6 @@ struct Texture : Image {
                                                        VkFormat format);
   static Box<Texture> load_cubemap_single_file(std::string folder,
                                                VkFormat format);
-  VkDescriptorSet bind_to_set(VkDescriptorSet set, u32 bind) {
-    // std::cout << origin << " -- binding to set " << set << ":" << bind
-    // <<"\n";
-    return Image::bind_to_set(set, bind);
-  }
 
   void show(const char* name) {
     ImGui::Text("%s: %s", name, origin.data());

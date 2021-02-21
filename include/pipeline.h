@@ -165,11 +165,14 @@ struct Pipeline {
     if (!set) {
       set = allocate_set(idx);
       write_set(set);
+    } else {
+      static VkDescriptorSet bound_set = 0;
+      if (bound_set == set) return;
+      bound_set = set;
     }
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, idx,
                             1, &set, 0, 0);
   }
-
 
   void show() {
     ImGui::Begin(shader.data());

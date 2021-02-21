@@ -98,6 +98,7 @@ struct PhysicsSimulator {
     body->setLinearVelocity(
         btVector3(initial_velocity.x, initial_velocity.y, initial_velocity.z));
     world->addRigidBody(body);
+    body->getUserIndex();
     return body;
   }
 
@@ -208,7 +209,6 @@ int main() {
   f32 speed = 1.f;
   f32x4 force;
 
-  
   while (xofo::poll()) {
     f64 dt = xofo::dt();
     auto mdelta = mouse_delta() * -0.0012f;
@@ -228,50 +228,20 @@ int main() {
 
     uniform->copy(cam.pos);
 
-    if (mbutton(0)) {
-      auto cb = sim.cast_ray(cam.pos, cam.mouse_ray);
-      auto& arr = cb.m_collisionObjects;
-      f32x3 right = cross<f32>(cam.up().xyz, cam.mouse_ray.xyz);
-      force = 40.f * (-mouse_delta().x * right - mouse_delta().y * cam.mouse_ray.xyz);
-      static btRigidBody* obj = 0;
-      static btRigidBody* prev = 0;
-      static f32x3 offset = 0;
-      for (u32 i = 0; i < arr.size(); ++i) {
-        auto body = btRigidBody::upcast(arr[i]);
-        if (!body->isStaticObject()) {
-          prev = obj;
-          obj =  ((btRigidBody*)body);
-          offset = (f32x3&)body->getCenterOfMassPosition() - cam.pos.xyz;
-          break;
-          // auto diff = cb.m_hitPointWorld[i] -  body->getCenterOfMassPosition();
-          // auto b = ((btRigidBody*)body);
-          // b->clearForces();
-          // b->applyForce((btVector3&)force, btVector3(0,0,0));
-          // b->activate(1);  
-        }
-      }
-
-      if (obj && obj == prev) {
-        f32x3 disp = force;
-        f32x3 diff = (f32x3&)obj->getCenterOfMassPosition() - cam.pos.xyz;
-        //obj->clearForces();
-        obj->applyCentralForce((btVector3&)force);
-        obj->activate(1);  
-      }
-    }
-
+  
     sim.integrate(dt);
 
     {
       static float timer = 0;
       if ((timer += dt) > 0.1 && get_key(Key::E)) {
         timer = 0;
-        sim.add_body(0, 2, cam.pos.xyz + 2.f * cam.mouse_ray.xyz,
+        sim.add_body(0, 1, cam.pos.xyz + 2.f * cam.mouse_ray.xyz,
                      10 * cam.mouse_ray.xyz);
         // xforms.emplace_back(cam.pos.xyz, cam.mouse_ray.xyz);
         // xforms.emplace_back(cam.pos.xyz, -cam.ori[2].xyz);
       }
-      if(get_key(Key::R)) sim.clear();
+      if (get_key(Key::R))
+        sim.clear();
     }
 
     xofo::draw(
@@ -290,7 +260,7 @@ int main() {
           // model1.draw(*pipeline, f32x4x4(1));
           // model2.draw(*pipeline, f32x4x4(1));
           auto xforms = sim.get_matricies();
-          auto scale = f32x4x4(2.f) * inv_scale(cube.box);
+          auto scale = inv_scale(cube.box);
           for (auto& xform : xforms) {
             cube.draw(*pipeline, scale * xform);
           }
@@ -298,21 +268,21 @@ int main() {
           grid_pipe->bind();
           grid_pipe->push(f32x4x4(1), 128);
           grid_buffer->bind_vertex();
-          vkCmdDraw(vk, 2, 1, 8004, 0);
+          vkCmdDraw(vk, 8004, 1, 0, 0);
 
-          {
-            static float timer = 0;
-            static bool toggler = true;
-            if ((timer += dt) > 0.2 && get_key(Key::SPACE))
-              (timer = 0), toggler = !toggler;
-            if (toggler) {
-              ((f32x3*)grid_buffer->mapping)[8004] = cam.pos;
-              ((f32x3*)grid_buffer->mapping)[8005] =
-                  cam.pos.xyz + cam.mouse_ray.xyz * 10.f;
-            }
-          }
+          // {
+          //   static float timer = 0;
+          //   static bool toggler = true;
+          //   if ((timer += dt) > 0.2 && get_key(Key::SPACE))
+          //     (timer = 0), toggler = !toggler;
+          //   if (toggler) {
+          //     ((f32x3*)grid_buffer->mapping)[8004] = cam.pos;
+          //     ((f32x3*)grid_buffer->mapping)[8005] =
+          //         cam.pos.xyz + cam.mouse_ray.xyz * 10.f;
+          //   }
+          // }
 
-          //box.draw(xforms, *grid_pipe);
+          // box.draw(xforms, *grid_pipe);
         },
         [&]() {
           using namespace ImGui;
